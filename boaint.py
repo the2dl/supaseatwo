@@ -71,39 +71,41 @@ def select_hostname():
     return selected_host
 
 
-def download_file(hostname, local_path, remote_path):
-    """Request a download from a specific host and insert into the 'downloads' table."""
-    print(f"Requesting download from {hostname}...")
-    result = supabase.table('downloads').insert({
+def download_file(hostname, file_path):
+    """Download a file from a specific host by inserting a 'download' command."""
+    print(f"Requesting download of '{file_path}' from {hostname}...")
+    result = supabase.table('py2').insert({
         'hostname': hostname,
-        'local_path': local_path,
-        'remote_path': remote_path,
-        'file_url': '',  # Initially empty, to be updated once the file is available
-        'status': 'Requested'  # Status changed to 'Requested'
+        'command': f"download {file_path}",
+        'status': 'Pending'
     }).execute()
 
     command_id = result.data[0]['id']
-    print(f"Download request added with ID {command_id}.")
+    print(f"Download command added with ID {command_id}. Waiting for file...")
 
-    # Assuming the remote system updates the 'file_url' and 'status' once the file is uploaded...
+    # Poll for command execution output (containing the file URL)
     while True:
-        db_response = supabase.table('downloads').select('status', 'file_url').eq('id', command_id).execute()
+        db_response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
+
+        # Corrected: Use different variable name for Supabase response
         command_info = db_response.data[0]
 
         if command_info['status'] in ('Completed', 'Failed'):
-            file_url = command_info['file_url']
+            file_url = command_info.get('output', '')
             if command_info['status'] == 'Completed' and file_url:
                 try:
+                    # Use a different variable name for the requests response
                     file_response = requests.get(file_url)
                     file_response.raise_for_status()
 
-                    local_dir = os.path.dirname(local_path)
+                    # Create local directory if it doesn't exist
+                    local_dir = os.path.dirname(file_path)
                     if not os.path.exists(local_dir):
                         os.makedirs(local_dir)
 
-                    with open(local_path, 'wb') as f:
-                        f.write(file_response.content)
-                    print(f"File '{local_path}' downloaded successfully.")
+                    with open(file_path, 'wb') as f:
+                        f.write(file_response.content)  # Use file_response here
+                    print(f"File '{file_path}' downloaded successfully.")
                 except requests.exceptions.RequestException as e:
                     print(f"Download failed: {e}")
             else:
@@ -271,14 +273,6 @@ def send_command_and_get_output(hostname):
             except ValueError:
                 print("Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
-        elif command_text.startswith("download"):
-            try:
-                _, file_path = command_text.split()
-                download_file(hostname, file_path)
-                continue
-            except ValueError:
-                print("Invalid download command format. Use 'download <file_path>'.")
-                continue
 
         # Insert command into database
         result = supabase.table('py2').insert({
@@ -308,7 +302,6 @@ def send_command_and_get_output(hostname):
                 else:
                     print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
                 break
-
 
 def main():
     print("\n░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░        ░▒▓██████▓▒░░▒▓███████▓▒░")
