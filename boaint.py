@@ -70,41 +70,40 @@ def select_hostname():
 
     return selected_host
 
-def download_file(hostname, file_path):
-    """Download a file from a specific host by inserting a 'download' command."""
-    print(f"Requesting download of '{file_path}' from {hostname}...")
-    result = supabase.table('py2').insert({
+
+def download_file(hostname, local_path, remote_path):
+    """Request a download from a specific host and insert into the 'downloads' table."""
+    print(f"Requesting download from {hostname}...")
+    result = supabase.table('downloads').insert({
         'hostname': hostname,
-        'command': f"download {file_path}",
-        'status': 'Pending'
+        'local_path': local_path,
+        'remote_path': remote_path,
+        'file_url': '',  # Initially empty, to be updated once the file is available
+        'status': 'Requested'  # Status changed to 'Requested'
     }).execute()
 
     command_id = result.data[0]['id']
-    print(f"Download command added with ID {command_id}. Waiting for file...")
+    print(f"Download request added with ID {command_id}.")
 
-    # Poll for command execution output (containing the file URL)
+    # Assuming the remote system updates the 'file_url' and 'status' once the file is uploaded...
     while True:
-        db_response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
-
-        # Corrected: Use different variable name for Supabase response
+        db_response = supabase.table('downloads').select('status', 'file_url').eq('id', command_id).execute()
         command_info = db_response.data[0]
 
         if command_info['status'] in ('Completed', 'Failed'):
-            file_url = command_info.get('output', '')
+            file_url = command_info['file_url']
             if command_info['status'] == 'Completed' and file_url:
                 try:
-                    # Use a different variable name for the requests response
                     file_response = requests.get(file_url)
                     file_response.raise_for_status()
 
-                    # Create local directory if it doesn't exist
-                    local_dir = os.path.dirname(file_path)
+                    local_dir = os.path.dirname(local_path)
                     if not os.path.exists(local_dir):
                         os.makedirs(local_dir)
 
-                    with open(file_path, 'wb') as f:
-                        f.write(file_response.content)  # Use file_response here
-                    print(f"File '{file_path}' downloaded successfully.")
+                    with open(local_path, 'wb') as f:
+                        f.write(file_response.content)
+                    print(f"File '{local_path}' downloaded successfully.")
                 except requests.exceptions.RequestException as e:
                     print(f"Download failed: {e}")
             else:
@@ -117,50 +116,62 @@ def download_file(hostname, file_path):
             time.sleep(0.1)
         time.sleep(current_sleep_interval)
 
-def list_and_download_files():
-    """List files in Supabase storage and allow downloading a selected file."""
+def download_file_from_supabase(file_url, local_path):
+    """Downloads a file from Supabase storage using the given URL and saves it to the specified local path."""
+    headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}'
+    }
     try:
-        bucket_name = "files"  # Replace with your bucket name
-        files = supabase.storage.from_(bucket_name).list()
-
-        if not files:
-            print("No files found in Supabase storage.")
-            return
-
-        print("\nAvailable Files:")
-        for i, file in enumerate(files, 1):
-            print(f"{i}. {file['name']}")
-
-        while True:
-            try:
-                choice = int(input("\nEnter the number of the file to download (or 0 to go back): "))
-                if choice == 0:
-                    return
-                elif 0 < choice <= len(files):
-                    selected_file = files[choice - 1]
-                    break
-                else:
-                    print("Invalid choice.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-
-        file_name = selected_file['name']
-        file_path = input(f"Enter the local path to save '{file_name}': ")
-
-        print(f"Downloading '{file_name}' to '{file_path}'...")
-        file_data = supabase.storage.from_(bucket_name).download(file_name)
-
-        # Create local directory if it doesn't exist
-        local_dir = os.path.dirname(file_path)
+        local_dir = os.path.dirname(local_path) or '.'
         if not os.path.exists(local_dir):
-            os.makedirs(local_dir)
+            os.makedirs(local_dir, exist_ok=True)
 
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-        print(f"File '{file_name}' downloaded successfully.")
+        response = requests.get(file_url, headers=headers)
+        response.raise_for_status()
 
-    except Exception as e:
-        print(f"Error listing or downloading files: {e}")
+        with open(local_path, 'wb') as f:
+            f.write(response.content)
+        print(f"File downloaded successfully to {local_path}")
+    except requests.exceptions.RequestException as e:
+        print(f"Download failed: {response.status_code} - {response.reason} - {e}")
+    except OSError as e:
+        print(f"Invalid directory: {e}")
+
+
+def list_and_download_files(hostname):
+    """List and download files for a specific hostname based on the downloads table."""
+    print(f"Fetching download records for {hostname}...")
+    downloads = supabase.table("downloads").select("*").eq("hostname", hostname).eq("status", "Completed").execute().data
+
+    if not downloads:
+        print("No completed downloads found for this host.")
+        return
+
+    print("\nAvailable Downloads:")
+    for i, download in enumerate(downloads, 1):
+        print(f"{i}. {download['local_path']} at {download['remote_path']} (URL: {download['file_url']})")
+
+    try:
+        choice = int(input("\nEnter the number of the file to download (or 0 to go back): "))
+        if choice == 0:
+            return
+        elif 0 < choice <= len(downloads):
+            selected_download = downloads[choice - 1]
+            file_name = os.path.basename(selected_download['remote_path'])
+            file_path = input(f"Enter the local path to save (ex. /home/user/file.txt) '{file_name}': ")
+            if os.path.isdir(file_path) or not os.path.exists(os.path.dirname(file_path) or '.'):
+                print("Invalid directory. Please enter a valid directory path.")
+                return
+
+            print(f"Downloading '{file_name}' to '{file_path}'...")
+            download_file_from_supabase(selected_download['file_url'], file_path)
+        else:
+            print("Invalid choice. Please try again.")
+    except ValueError:
+        print("Please enter a valid number.")
+    except FileNotFoundError as e:
+        print(f"Invalid directory: {e}")
 
 def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
@@ -231,7 +242,7 @@ def send_command_and_get_output(hostname):
         # Translate the command text using friendly name mapping
         command_text = command_mappings.get(command_text, command_text)
 
-        # Handle 'sleep' command
+        # Process the command according to type
         if command_text.startswith('sleep'):
             try:
                 _, interval = command_text.split()
@@ -242,18 +253,24 @@ def send_command_and_get_output(hostname):
             except (ValueError, IndexError):
                 print("Invalid sleep command format. Use 'sleep <number>'.")
                 continue
-
-        # Handle 'upload' command
         elif command_text.startswith("upload"):
             try:
                 _, local_path, remote_path = command_text.split()
                 upload_file(hostname, local_path, remote_path)
-                continue  # Skip inserting the upload command into the database
+                continue
             except ValueError:
                 print("Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
+        elif command_text.startswith("download"):
+            try:
+                _, file_path = command_text.split()
+                download_file(hostname, file_path)
+                continue
+            except ValueError:
+                print("Invalid download command format. Use 'download <file_path>'.")
+                continue
 
-        # Insert other commands into the py2 table for the selected host
+        # Insert command into database
         result = supabase.table('py2').insert({
             'hostname': hostname,
             'command': command_text,
@@ -262,12 +279,18 @@ def send_command_and_get_output(hostname):
 
         command_id = result.data[0]['id']
         print(f"Command '{command_text}' added with ID {command_id}.")
+        print("Waiting for the command to complete...", end="", flush=True)
 
-        # Poll for command execution output
+        first_pass = True
         while True:
+            if not first_pass:
+                for _ in range(10):  # Adjust number for less frequent updates
+                    print(next(spinner), end="\b", flush=True)
+                    time.sleep(0.1)
+            first_pass = False
+
             response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
             command_info = response.data[0]
-
             if command_info['status'] in ('Completed', 'Failed'):
                 output = command_info.get('output', 'No output available')
                 if command_info['status'] == 'Failed':
@@ -275,12 +298,6 @@ def send_command_and_get_output(hostname):
                 else:
                     print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
                 break
-
-            print("Waiting for the command to complete...", end="", flush=True)
-            for _ in range(20):
-                print(next(spinner), end="\b", flush=True)
-                time.sleep(0.1)
-            time.sleep(current_sleep_interval)
 
 
 def main():
@@ -313,12 +330,13 @@ def main():
         elif choice == 2:
             print("Returning to host selection, validating host status...")
             hostname = select_hostname()
+            continue  # This continue is important to skip the rest of the loop and re-evaluate the while condition.
         elif choice == 3:
             print("Exiting to local terminal.")
-            break
+            break  # This breaks out of the while loop, thus terminating the interaction.
         elif choice == 4:
             print("Listing downloaded files.")
-            list_and_download_files()
+            list_and_download_files(hostname)  # Pass the current hostname directly
         else:
             print("Invalid choice. Please try again.")
 
