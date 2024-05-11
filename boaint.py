@@ -177,17 +177,20 @@ def upload_file(hostname, local_path, remote_path):
         # Extract just the filename from the local_path for uploading
         filename = os.path.basename(local_path)
 
-        print(f"Uploading '{local_path}' as '{filename}' on '{hostname}'...")
+        # Include the folder path where the file should be uploaded in the bucket
+        storage_path = f"uploads/{filename}"
+
+        print(f"Uploading '{local_path}' as '{storage_path}' on '{hostname}'...")
 
         with open(local_path, 'rb') as f:
-            # Here we use only the filename as the key for the upload
-            response = supabase.storage.from_(bucket_name).upload(filename, f)
+            # Use the storage_path which includes the folder path in the bucket
+            response = supabase.storage.from_(bucket_name).upload(storage_path, f)
 
             # It's good to check response status to handle errors properly
             if response.status_code not in [200, 201]:
                 raise Exception(f"Failed to upload: {response.json().get('message')}")
 
-        file_url = get_public_url(bucket_name, filename)
+        file_url = get_public_url(bucket_name, storage_path)
         print(f"Upload successful! File available at: {file_url}")
 
         # Insert record into the uploads table with the full remote path
