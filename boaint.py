@@ -208,15 +208,15 @@ def send_command_and_get_output(hostname):
     global current_sleep_interval
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' to return to the main menu.")
     print("----------------")
-    print("Available Commands:")
-    print("  sleep <number>       :: Set a custom timeout (ex. sleep 5)")
-    print("  download <file_path> :: Download a file from the asset")
+    print("Available Commands")
+    print("  sleep <number>                    :: Set a custom timeout (ex. sleep 5)")
+    print("  download <file_path>              :: Download a file from the asset")
     print("  upload <local_path> <remote_path> :: Upload a file to the asset")
-    print("  ls                   :: List directory (powershell ls)")
-    print("  ps                   :: Retrieve the process list (powershell get-process)")
-    print("  whoami               :: List user details (whoami /all)")
-    print("  pwd                  :: Current working directory (powershell pwd)")
-    print("  exit                 :: Return to main menu")
+    print("  ls                                :: List directory (powershell ls)")
+    print("  ps                                :: Retrieve the process list (powershell get-process)")
+    print("  whoami                            :: List user details (whoami /all)")
+    print("  pwd                               :: Current working directory (powershell pwd)")
+    print("  exit                              :: Return to main menu")
     print("----------------")
 
     while True:
