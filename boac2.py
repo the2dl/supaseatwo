@@ -99,7 +99,6 @@ def handle_download_command(command_text):
             # Check if the upload was successful
             if response.status_code == 200 or response.status_code == 201:
                 # Successful HTTP status for uploads
-                print(f"File '{file_name}' uploaded to your storage successfully.")
             else:
                 # Failed upload, try to parse error message from response
                 error_data = response.json()
@@ -109,7 +108,6 @@ def handle_download_command(command_text):
         return "Completed", f"File '{file_name}' uploaded to your storage."
 
     except Exception as e:
-        print(f"Error in handle_download_command: {e}")
         return "Failed", str(e)
 
 def get_public_url(bucket_name, file_path):
@@ -131,10 +129,8 @@ def download_from_supabase(file_url, remote_path, supabase_key):
     if response.status_code == 200:
         with open(remote_path, 'wb') as file:
             file.write(response.content)
-        print(f"Download successful, file saved to {remote_path}")
         return True
     else:
-        print(f"Failed to download file: {response.status_code} - {response.reason}")
         return False
 
 def fetch_pending_uploads():
