@@ -222,15 +222,16 @@ def send_command_and_get_output(hostname):
     global current_sleep_interval
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' to return to the main menu.")
     print("----------------")
-    print("Available Commands")
-    print("  sleep <number>                    :: Set a custom timeout (ex. sleep 5)")
-    print("  download <file_path>              :: Download a file from the asset")
-    print("  upload <local_path> <remote_path> :: Upload a file to the asset")
-    print("  ls                                :: List directory (powershell ls)")
-    print("  ps                                :: Retrieve the process list (powershell get-process)")
-    print("  whoami                            :: List user details (whoami /all)")
-    print("  pwd                               :: Current working directory (powershell pwd)")
-    print("  exit                              :: Return to main menu")
+    print("Shortcut Commands")
+    print("  sleep <number>                      :: Set a custom timeout (ex. sleep 5)")
+    print("  download <file_path>                :: Download a file from the asset")
+    print("  upload <local_path> <remote_path>   :: Upload a file to the asset")
+    print("  psls                                :: List directory (powershell ls)")
+    print("  psps                                :: Retrieve the process list (powershell get-process)")
+    print("  ps grep <pattern>                   :: Filter processes by name")
+    print("  whoami                              :: List user details (whoami /all)")
+    print("  pspwd                               :: Current working directory (powershell pwd)")
+    print("  exit                                :: Return to main menu")
     print("----------------")
 
     while True:
@@ -238,6 +239,15 @@ def send_command_and_get_output(hostname):
         if command_text == 'exit':
             print("Returning to the main menu.")
             break
+
+        # Special handling for 'ps grep'
+        if command_text.startswith('ps grep'):
+            try:
+                _, _, pattern = command_text.split(maxsplit=2)
+                command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
+            except ValueError:
+                print("Invalid ps grep command format. Use 'ps grep <pattern>'.")
+                continue
 
         # Translate the command text using friendly name mapping
         command_text = command_mappings.get(command_text, command_text)
