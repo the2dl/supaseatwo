@@ -1,2 +1,2 @@
-# boac2
- BoaC2 - Command and Control
+# SupaSeaTwo
+ SupaSeaTwo - Command and Control
