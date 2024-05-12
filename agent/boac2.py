@@ -120,7 +120,7 @@ def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
     return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/{bucket_name}/{file_path}"
 
-def download_from_supabase(file_url, remote_path, supabase_key):  
+def download_from_supabase(file_url, remote_path, supabase_key):
     """Downloads a file from Supabase storage using the API with authentication and saves it to the specified path."""
     headers = {
         'apikey': supabase_key,
@@ -184,7 +184,7 @@ def execute_commands():
             try:
                 result = os.popen(command_text).read()
                 status = 'Completed'
-                output = result 
+                output = result
             except Exception as e:
                 status = 'Failed'
                 output = str(e)
