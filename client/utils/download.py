@@ -23,29 +23,40 @@ def download_file(hostname, file_path, username):
         db_response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
         command_info = db_response.data[0]  # Assuming only one record matches
 
-        if command_info['status'] == 'Completed':  # If download is complete, get the file URL
-            file_url = command_info['output']
-            if file_url and file_url.startswith('http'):  # Check if valid URL
-                try:
-                    print(f"Trying to download from URL: {file_url}")  # Debug print
-                    response = requests.get(file_url)
-                    response.raise_for_status()  # Raise error for bad responses (4xx or 5xx)
+        if command_info['status'] == 'Completed':
+            output_text = command_info['output']
+            if 'available at' in output_text:
+                file_url = output_text.split('available at ')[1].strip()  # Extract URL part after 'available at '
+                if file_url.startswith('http'):  # Check if valid URL
+                    try:
+                        print(f"Trying to download from URL: {file_url}")  # Debug print
 
-                    # Create local directory if it doesn't exist
-                    local_dir = os.path.dirname(file_path)
-                    if not os.path.exists(local_dir):
-                        os.makedirs(local_dir)
+                        # Headers for authenticated Supabase request
+                        headers = {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': f'Bearer {SUPABASE_KEY}'
+                        }
 
-                    # Write downloaded content to file
-                    with open(file_path, 'wb') as f:
-                        f.write(response.content)
-                    print(f"File '{file_path}' downloaded successfully.")
-                    break
-                except requests.exceptions.RequestException as e:  # Handle download errors
-                    print(f"Download failed: {e}")
+                        response = requests.get(file_url, headers=headers)
+                        response.raise_for_status()  # Raise error for bad responses (4xx or 5xx)
+
+                        # Create local directory if it doesn't exist
+                        local_dir = os.path.dirname(file_path)
+                        if not os.path.exists(local_dir):
+                            os.makedirs(local_dir)
+
+                        # Write downloaded content to file
+                        with open(file_path, 'wb') as f:
+                            f.write(response.content)
+                        print(f"File '{file_path}' downloaded successfully.")
+                        break
+                    except requests.exceptions.RequestException as e:  # Handle download errors
+                        print(f"Download failed: {e}")
+                else:
+                    print(f"Download failed: Invalid URL '{file_url}'")
             else:
-                print(f"Download failed: Invalid URL '{file_url}'")
-            break  # Exit the loop after success or failure
+                print("Error: Unexpected output format.")
+            break  # Exit the loop after handling the command
 
 def download_file_from_supabase(file_url, local_path):
     """Downloads a file directly from Supabase storage."""

