@@ -30,18 +30,26 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         if command_text == 'help':
             print("\nAvailable Shortcut Commands:")
             for shortcut, command in command_mappings.items():
-                print(f"  {shortcut:<10} :: {command}")
-            print("  sleep <number>          :: Set a custom timeout (ex. sleep 5)")
-            print("  download <file_path>    :: Download a file from the asset")
+                print(f"  {shortcut:<10}               :: {command}")
+            print("  sleep <number>                    :: Set a custom timeout (ex. sleep 5)")
+            print("  download <file_path>              :: Download a file from the asset")
             print("  upload <local_path> <remote_path> :: Upload a file to the asset")
-            print("  ps grep <pattern>       :: Filter processes by name")
-            print("  exit                    :: Return to main menu\n")
+            print("  ps grep <pattern>                 :: Filter processes by name")
+            print("  psrun <pattern>                   :: Start a new process via Powershell")
+            print("  cmdrun <pattern>                  :: Start a new process via cmd")
+            print("  kill                              :: Send a signal to terminate the agent")
+            print("  exit                              :: Return to main menu\n")
             continue
 
         # Exit command
         if command_text == 'exit':
             print("Returning to the main menu.")
             break
+
+        # Kill command
+        if command_text == 'kill':
+            print(f"Sending kill command to terminate {GREEN}{hostname}{RESET} agent.")
+            command_text = "kill"  # ensure the command text is exactly "kill" to match agent's expectation
 
         # Download command
         if command_text.startswith("download "):
@@ -63,6 +71,28 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
             except ValueError:
                 print("Invalid ps grep command format. Use 'ps grep <pattern>'.")
+                continue
+
+        # psrun command
+        if command_text.startswith("psrun "):
+            try:
+                _, command = command_text.split(maxsplit=1)
+                subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
+                print(f"Started process: {command}")
+                continue
+            except ValueError:
+                print("Invalid psrun command format. Use 'psrun <path_to_executable_or_file>'")
+                continue
+
+        # cmdrun command (new)
+        if command_text.startswith("cmdrun "):
+            try:
+                _, command = command_text.split(maxsplit=1)
+                subprocess.Popen(["cmd.exe", "/c", f"start {command}"])  # Use "/c" to close cmd after
+                print(f"Started process: {command}")
+                continue
+            except ValueError:
+                print("Invalid cmdrun command format. Use 'cmdrun <path_to_executable_or_file>'")
                 continue
 
         # Translate using command mappings
@@ -102,6 +132,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             'command': command_text,
             'status': 'Pending'
         }).execute()
+
+        if command_text == 'kill':
+            print(f"Kill command sent to {hostname}. Shutting down.")
+            continue  # Do not wait for a response, as the agent will terminate
 
         command_id = result.data[0]['id']
         print(f"Command '{command_text}' added with ID {command_id}.")
