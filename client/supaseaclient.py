@@ -25,7 +25,7 @@ command_mappings = {
     "psls": "powershell ls",
     "psps": "powershell get-process",
     "pspwd": "powershell pwd",
-    "whoami": "whoami /all",
+    "whoamiall": "whoami /all",
     # ... add more mappings as needed
 }
 
