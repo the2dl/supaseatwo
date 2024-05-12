@@ -23,7 +23,7 @@ RESET = '\033[0m'
 # Command mappings for shortcuts
 command_mappings = {
     "psls": "powershell ls",
-    "ps": "powershell get-process",
+    "psps": "powershell get-process",
     "pspwd": "powershell pwd",
     "whoami": "whoami /all",
     # ... add more mappings as needed
@@ -67,23 +67,57 @@ def select_hostname():
             color = RED if status in ["dead", "likely dead", "no check-in info"] else GREEN
             print(f"{index}. {color}{hostname} ({status}){RESET}")
 
-        # Adding an exit option
-        print(f"{len(hosts) + 1}. exit supaseatwo")
+        # Adding options to remove a host or exit
+        print(f"{len(hosts) + 1}. Remove a host")
+        print(f"{len(hosts) + 2}. Exit")
 
         try:
-            choice = int(input("\nSelect a host to interact with or exit (by number). Hit enter to refresh availability: "))
+            choice = int(input("\nSelect a host to interact with, remove, or exit (by number): "))
             if 1 <= choice <= len(hosts):
                 selected_host = hosts[choice - 1]['hostname']
                 print(f"You have selected {selected_host}.")
                 return selected_host  # Successfully return the selected hostname
             elif choice == len(hosts) + 1:
-                print("byebye.")
+                hostname_to_remove = remove_host(hosts)
+                if hostname_to_remove:
+                    print(f"Host {hostname_to_remove} removed successfully.")
+                continue  # Continue the loop to allow further actions
+            elif choice == len(hosts) + 2:
+                print("Exiting...")
                 return None  # User chooses to exit
             else:
                 print("Invalid selection. Please enter a number within the list range.")
         except ValueError:
             print("Invalid selection. Please enter a valid number.")
 
+def remove_host(hosts):
+    """Allows the user to select and remove a host from the database."""
+
+    print("\nSelect a host to remove:")
+    for index, host in enumerate(hosts, start=1):
+        print(f"{index}. {host['hostname']}")
+
+    try:
+        choice = int(input("Enter the number of the host to remove: "))
+        if 1 <= choice <= len(hosts):
+            hostname_to_remove = hosts[choice - 1]['hostname']
+
+            # Delete host from the database
+            response = supabase.table('settings').delete().match({'hostname': hostname_to_remove}).execute()
+
+            if response.data:
+                print(f"Host {hostname_to_remove} removed successfully.")
+            else:
+                try:
+                    error_data = response.json()
+                    error_message = error_data.get("message", "Unknown error")
+                    print(f"Failed to remove host: {error_message}")
+                except ValueError:  # Catch JSON decoding errors
+                    print("Failed to remove host. Unexpected response format.")
+        else:
+            print("Invalid selection.")
+    except ValueError:
+        print("Please enter a valid number.")
 
 def get_host_status(hostname):
     """Fetch the current status of the host from the database."""
@@ -93,6 +127,13 @@ def get_host_status(hostname):
     return 'Unknown'
 
 def main():
+
+    print("\n                                             _                       ")
+    print("     o o o ____  _ _ __  __ _   ___ ___ __ _  | |___ __ _____ o o o    ")
+    print("  o o o o (_-< || | '_ \/ _` | (_-</ -_) _` | |  _\ V  V / _ \ o o o o ")
+    print("    o o o /__/\_,_| .__/\__,_| /__/\___\__,_|  \__|\_/\_/\___/ o o o   ")
+    print("       o        |_|                                             o      \n")
+
     username = login.login()
     if username is None:
         print("Login failed or was cancelled.")

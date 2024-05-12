@@ -219,27 +219,42 @@ def execute_commands():
         update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
 def handle_kill_command(command_id, command_text, hostname):
-    """Check for the 'kill' command, update the status before exiting, and update settings."""
+    """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
     if command_text.strip().lower() == "kill":
-        print("Kill command received. Updating status and exiting agent.")
+        logging.info("Kill command received. Updating status and preparing to exit agent.")
 
+        # Update the command status to 'Completed' and note that the agent is being terminated
         try:
-            # Update the status to 'Completed' for the command before exiting
-            response = update_command_status(command_id, 'Completed', 'Agent terminated')
+            response = supabase.table('py2').update({
+                'status': 'Completed',
+                'output': 'Agent terminated'
+            }).eq('id', command_id).execute()
 
-            if response.data:  # check if update was successful
-                print("Command status updated successfully.")
+            if response.data:
+                logging.info("Command status updated successfully to 'Completed'.")
             else:
-                print(f"Error updating command status: {response.text}")
+                logging.warning(f"Error updating command status: {response.json()}")  # Log error details
 
-            # Update the 'settings' table to mark the asset as 'Dead'
-            update_settings_status(hostname, 'Dead')
+        except Exception as e:
+            logging.error(f"Failed to update command status before termination: {e}")
 
-        except Exception as e:  # Catch general exceptions for the status update
-            print(f"Failed to update command or settings status before termination: {e}")
+        # Update the 'settings' table to mark the agent as 'Dead'
+        try:
+            response = supabase.table('settings').update({
+                'check_in': 'Dead'
+            }).eq('hostname', hostname).execute()
 
-        finally:  # This block will always execute, even if an exception occurs
-            os._exit(0)  # Terminate the process immediately
+            if response.data:
+                logging.info("Agent status updated successfully to 'Dead'.")
+            else:
+                logging.warning(f"Error updating agent status: {response.json()}")  # Log error details
+
+        except Exception as e:
+            logging.error(f"Failed to update agent status before termination: {e}")
+
+        finally:
+            logging.info("Shutdown sequence initiated.")
+            os._exit(0)  # Force the agent to terminate
 
 def update_settings_status(hostname, status):
     """Update the check-in status of the hostname in the settings table."""
@@ -248,10 +263,10 @@ def update_settings_status(hostname, status):
             'check_in': status
         }).eq('hostname', hostname).execute()
 
-        if response.data:
+        if response.status_code == 200: # changed from response.data to response.status_code
             logging.info(f"Status for {hostname} updated to {status}.")
         else:
-            logging.warning(f"Failed to update status for {hostname}: {response.text}")
+            logging.warning(f"Failed to update status for {hostname}. Error details: {response.json()}") # changed this
     except Exception as e:
         logging.error(f"An error occurred while updating status for {hostname}: {e}")
 
