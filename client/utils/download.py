@@ -1,7 +1,6 @@
 import os
 import requests
-
-from .database import supabase, get_public_url, SUPABASE_KEY
+from .database import supabase, SUPABASE_KEY
 
 def download_file(hostname, file_path, username):
     """Downloads a file from the specified host."""
@@ -29,26 +28,8 @@ def download_file(hostname, file_path, username):
                 file_url = output_text.split('available at ')[1].strip()  # Extract URL part after 'available at '
                 if file_url.startswith('http'):  # Check if valid URL
                     try:
-                        print(f"Trying to download from URL: {file_url}")  # Debug print
+                        print(f"File available at URL: {file_url}")  # Debug print
 
-                        # Headers for authenticated Supabase request
-                        headers = {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': f'Bearer {SUPABASE_KEY}'
-                        }
-
-                        response = requests.get(file_url, headers=headers)
-                        response.raise_for_status()  # Raise error for bad responses (4xx or 5xx)
-
-                        # Create local directory if it doesn't exist
-                        local_dir = os.path.dirname(file_path)
-                        if not os.path.exists(local_dir):
-                            os.makedirs(local_dir)
-
-                        # Write downloaded content to file
-                        with open(file_path, 'wb') as f:
-                            f.write(response.content)
-                        print(f"File '{file_path}' downloaded successfully.")
                         break
                     except requests.exceptions.RequestException as e:  # Handle download errors
                         print(f"Download failed: {e}")
