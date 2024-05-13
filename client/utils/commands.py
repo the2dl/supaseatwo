@@ -2,11 +2,11 @@ import time
 import itertools
 import os
 import requests
+import subprocess
 
 from .database import supabase, get_public_url
 from .download import download_file
 from .upload import upload_file
-
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -25,6 +25,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
     while True:
         command_text = input("\nEnter a command to send: ").strip().lower()
+
+        # Check for empty command
+        if not command_text:
+            print("Invalid command, please enter a command.")
+            continue
 
         # Help command
         if command_text == 'help':
