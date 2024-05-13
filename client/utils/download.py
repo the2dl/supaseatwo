@@ -5,8 +5,7 @@ from .database import supabase, SUPABASE_KEY
 def download_file(hostname, file_path, username):
     """Downloads a file from the specified host."""
 
-    # Insert a new record into the py2 table in Supabase to trigger the download process
-    # on the remote machine.
+    # Insert a new record into the py2 table in Supabase to trigger the download process on the remote machine.
     result = supabase.table('py2').insert({
         'hostname': hostname,
         'username': username,
@@ -29,7 +28,7 @@ def download_file(hostname, file_path, username):
                 if file_url.startswith('http'):  # Check if valid URL
                     try:
                         print(f"File available at URL: {file_url}")  # Debug print
-
+                        download_file_from_supabase(file_url, f"./{os.path.basename(file_path)}")
                         break
                     except requests.exceptions.RequestException as e:  # Handle download errors
                         print(f"Download failed: {e}")
@@ -38,6 +37,11 @@ def download_file(hostname, file_path, username):
             else:
                 print("Error: Unexpected output format.")
             break  # Exit the loop after handling the command
+
+        elif command_info['status'] == 'Failed':
+            output_text = command_info['output']
+            print(f"Error: {output_text}")
+            break  # Exit the loop on failure
 
 def download_file_from_supabase(file_url, local_path):
     """Downloads a file directly from Supabase storage."""
@@ -55,7 +59,6 @@ def download_file_from_supabase(file_url, local_path):
         # Write to local file
         with open(local_path, 'wb') as f:
             f.write(response.content)
-        print(f"File downloaded successfully to {local_path}")
     except requests.exceptions.RequestException as e:
         print(f"Download failed: {response.status_code} - {response.reason} - {e}")
     except OSError as e:
