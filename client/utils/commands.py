@@ -3,6 +3,7 @@ import itertools
 import os
 import requests
 import subprocess
+import re
 
 from .database import supabase, get_public_url
 from .download import download_file
@@ -45,6 +46,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  kill                              :: Send a signal to terminate the agent")
             print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
             print("  wami                              :: Display user information on Windows host via Windows API")
+            print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -110,6 +112,19 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         # Handle the new 'wami' command
         if command_text == "wami":
             command_text = "wami"
+
+        # Handle the new 'users' command
+        users_match = re.match(r'users\s+"([^"]+)"', command_text, re.IGNORECASE)
+        if users_match:
+            group_name = users_match.group(1)
+            command_text = f'users "{group_name}"'
+        elif command_text.lower().startswith("users "):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 2:
+                command_text = f"users {parts[1]}"
+            else:
+                print("Invalid users command format. Use 'users <group_name>'.")
+                continue
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
