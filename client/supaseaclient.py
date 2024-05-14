@@ -25,7 +25,6 @@ RESET = '\033[0m'
 command_mappings = {
     "psps": "powershell get-process",
     "pspwd": "powershell pwd",
-    "wls": "Windows ls via API",
 
     # ... add more mappings as needed
 }

@@ -43,8 +43,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  psrun <pattern>                   :: Start a new process via Powershell")
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
-            print("  wls <directory_path>              :: List contents of a directory on Windows host")
-            print("  wami                              :: Display user information on Windows host")
+            print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
+            print("  wami                              :: Display user information on Windows host via Windows API")
             print("  exit                              :: Return to main menu\n")
             continue
 
