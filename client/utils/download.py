@@ -1,9 +1,10 @@
 import os
 import requests
+import time
 from .database import supabase, SUPABASE_KEY
 
 def download_file(hostname, file_path, username):
-    """Downloads a file from the specified host."""
+    """Triggers the download process on the remote machine and stores the file in Supabase storage."""
 
     # Insert a new record into the py2 table in Supabase to trigger the download process on the remote machine.
     result = supabase.table('py2').insert({
@@ -26,12 +27,7 @@ def download_file(hostname, file_path, username):
             if 'available at' in output_text:
                 file_url = output_text.split('available at ')[1].strip()  # Extract URL part after 'available at '
                 if file_url.startswith('http'):  # Check if valid URL
-                    try:
-                        print(f"File available at URL: {file_url}")  # Debug print
-                        download_file_from_supabase(file_url, f"./{os.path.basename(file_path)}")
-                        break
-                    except requests.exceptions.RequestException as e:  # Handle download errors
-                        print(f"Download failed: {e}")
+                    print(f"File available at URL: {file_url}")  # Debug print
                 else:
                     print(f"Download failed: Invalid URL '{file_url}'")
             else:
@@ -42,6 +38,9 @@ def download_file(hostname, file_path, username):
             output_text = command_info['output']
             print(f"Error: {output_text}")
             break  # Exit the loop on failure
+
+        # Sleep for a short period before polling again to avoid excessive requests
+        time.sleep(5)
 
 def download_file_from_supabase(file_url, local_path):
     """Downloads a file directly from Supabase storage."""

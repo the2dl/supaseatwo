@@ -8,7 +8,7 @@ from .system_info import get_system_info
 # Initialize Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def handle_download_command(command_text, username):
+def handle_download_command(command_text, username, supabase: Client):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
@@ -81,7 +81,7 @@ def fetch_pending_uploads(supabase: Client):
     response = supabase.table("uploads").select("*").eq("status", "pending").execute()
     return response
 
-def handle_upload_command(command_text, username):
+def handle_upload_command(command_text, username, supabase: Client):
     """Handle the 'upload' command by uploading the file to Supabase storage and updating the uploads table."""
     try:
         _, local_path, remote_path = command_text.split(maxsplit=2)
