@@ -8,7 +8,7 @@ from .config import SUPABASE_KEY
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from .winAPI import wls, wami, list_users_in_group  # Import the wls, wami, and list_users_in_group functions
+    from utils.winapi import wls, wami, list_users_in_group
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
