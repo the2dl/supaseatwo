@@ -23,10 +23,9 @@ RESET = '\033[0m'
 
 # Command mappings for shortcuts
 command_mappings = {
-    "psls": "powershell ls",
     "psps": "powershell get-process",
     "pspwd": "powershell pwd",
-    "whoamiall": "whoami /all",
+
     # ... add more mappings as needed
 }
 
