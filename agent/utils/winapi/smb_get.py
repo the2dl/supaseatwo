@@ -5,11 +5,11 @@ from smbprotocol.open import Open, CreateOptions, FileAttributes, ShareAccess, I
 import os
 import uuid
 
-def smb_write(local_file_path, remote_smb_path, username=None, password=None, domain=None):
-    """Writes a file to a remote host using the SMB protocol."""
+def smb_get(remote_file_path, local_file_path, username=None, password=None, domain=None):
+    """Gets a file from a remote host using the SMB protocol."""
     try:
         # Parse the remote SMB path
-        parts = remote_smb_path.split("\\")
+        parts = remote_file_path.split("\\")
         server = parts[2]
         share_name = parts[3]
         remote_path = "\\".join(parts[4:])
@@ -27,22 +27,22 @@ def smb_write(local_file_path, remote_smb_path, username=None, password=None, do
         # Open the remote file
         file_open = Open(tree, remote_path)
         file_open.create(
-            desired_access=FilePipePrinterAccessMask.GENERIC_WRITE,
-            create_disposition=CreateDisposition.FILE_OVERWRITE_IF,
+            desired_access=FilePipePrinterAccessMask.GENERIC_READ,
+            create_disposition=CreateDisposition.FILE_OPEN,
             create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
             file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
             impersonation_level=ImpersonationLevel.Impersonation,
             share_access=ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE | ShareAccess.FILE_SHARE_DELETE
         )
 
-        # Read local file data
-        with open(local_file_path, "rb") as f:
-            file_data = f.read()
-
-        # Write to remote file
-        file_open.write(file_data, 0)
+        # Read from remote file
+        file_data = file_open.read(0, file_open.end_of_file)
         file_open.close()
 
-        return f"Successfully wrote {local_file_path} to {remote_smb_path} on {server}"
+        # Write local file data
+        with open(local_file_path, "wb") as f:
+            f.write(file_data)
+
+        return f"Successfully got {remote_file_path} to {local_file_path} on {server}"
     except Exception as e:
         return f"Error: {str(e)}"
