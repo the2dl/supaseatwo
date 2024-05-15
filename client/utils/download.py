@@ -23,7 +23,7 @@ def download_file(hostname, file_path, username):
         command_info = db_response.data[0]  # Assuming only one record matches
 
         if command_info['status'] == 'Completed':
-            output_text = command_info['output']
+            output_text = command_info.get('output', '')
             if 'available at' in output_text:
                 file_url = output_text.split('available at ')[1].strip()  # Extract URL part after 'available at '
                 if file_url.startswith('http'):  # Check if valid URL
@@ -35,7 +35,7 @@ def download_file(hostname, file_path, username):
             break  # Exit the loop after handling the command
 
         elif command_info['status'] == 'Failed':
-            output_text = command_info['output']
+            output_text = command_info.get('output', '')
             print(f"Error: {output_text}")
             break  # Exit the loop on failure
 
@@ -58,8 +58,9 @@ def download_file_from_supabase(file_url, local_path):
         # Write to local file
         with open(local_path, 'wb') as f:
             f.write(response.content)
+        print(f"File downloaded to {local_path}")
     except requests.exceptions.RequestException as e:
-        print(f"Download failed: {response.status_code} - {response.reason} - {e}")
+        print(f"Download failed: {e}")
     except OSError as e:
         print(f"Invalid directory: {e}")
 
