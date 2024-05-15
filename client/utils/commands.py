@@ -49,6 +49,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
+            print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -160,8 +161,29 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 command_text = f"smb get {remote_file_path} {local_file_path}"
 
+        # Handle the new 'winrmexec' command
+        if command_text.startswith("winrmexec "):
+            parts = command_text.split()
+            if len(parts) < 3:
+                print("Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
+                continue
+            remote_host = parts[1]
+            command = parts[2]
+            if len(parts) == 6:
+                username, password, domain = parts[3], parts[4], parts[5]
+                command_text = f"winrmexec {remote_host} {command} {username} {password} {domain}"
+            else:
+                command_text = f"winrmexec {remote_host} {command}"
+
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
+
+        # Validate the winrmexec command before inserting it into the database
+        if command_text.startswith("winrmexec"):
+            parts = command_text.split()
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
+                continue
 
         # Sleep command with database update
         if command_text.startswith('sleep'):

