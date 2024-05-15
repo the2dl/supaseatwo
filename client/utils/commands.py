@@ -47,6 +47,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
             print("  wami                              :: Display user information on Windows host via Windows API")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
+            print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -129,6 +130,20 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 print("Invalid users command format. Use 'users <group_name>'.")
                 continue
+
+        # Handle the new 'smb write' command
+        if command_text.startswith("smb write"):
+            parts = command_text.split()
+            if len(parts) < 4:
+                print("Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'.")
+                continue
+            local_file_path = parts[2]
+            remote_smb_path = parts[3]
+            if len(parts) == 7:
+                username, password, domain = parts[4], parts[5], parts[6]
+                command_text = f"smb write {local_file_path} {remote_smb_path} {username} {password} {domain}"
+            else:
+                command_text = f"smb write {local_file_path} {remote_smb_path}"
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
