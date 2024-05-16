@@ -184,6 +184,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if len(parts) < 3:
                 print(f"{RED}Error:{RESET} Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
                 continue
+        
+        # Handle the new 'pwd' command
+        if command_text == "pwd":
+            command_text = "pwd"
 
         # Sleep command with database update
         if command_text.startswith('sleep'):
