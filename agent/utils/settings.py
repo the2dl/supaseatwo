@@ -2,11 +2,12 @@ import logging
 from datetime import datetime
 from .system_info import get_system_info
 from .config import supabase, SUPABASE_URL, SUPABASE_KEY, DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
+from .retry_utils import with_retries
 
 def fetch_settings(supabase):
     """Fetch the system settings from the settings table, or return default values."""
     hostname, ip, os_info = get_system_info()
-    response = supabase.table('settings').select('*').eq('hostname', hostname).limit(1).execute()
+    response = with_retries(lambda: supabase.table('settings').select('*').eq('hostname', hostname).limit(1).execute())
     settings_data = response.data
 
     now = datetime.utcnow().isoformat() + "Z"  # Timestamp in UTC format
@@ -18,9 +19,9 @@ def fetch_settings(supabase):
 
         # Try updating the last checked-in time with error handling
         try:
-            supabase.table('settings').update({
+            with_retries(lambda: supabase.table('settings').update({
                 'last_checked_in': now
-            }).eq('hostname', hostname).execute()
+            }).eq('hostname', hostname).execute())
         except Exception as e:
             logging.warning(f"Failed to update last checked-in time: {e}")
 
@@ -28,7 +29,7 @@ def fetch_settings(supabase):
     else:
         # Insert new system info if no record exists for this hostname
         try:
-            supabase.table('settings').insert({
+            with_retries(lambda: supabase.table('settings').insert({
                 'hostname': hostname,
                 'ip': ip,
                 'os': os_info,
@@ -36,7 +37,7 @@ def fetch_settings(supabase):
                 'check_in': DEFAULT_CHECK_IN,
                 'last_checked_in': now,
                 'username': ''  # Default empty string for username
-            }).execute()
+            }).execute())
         except Exception as e:  # Catch all exceptions during insert
             logging.error(f"An error occurred while inserting settings: {e}")
 

@@ -4,10 +4,11 @@ from smbprotocol.tree import TreeConnect
 from smbprotocol.open import Open, CreateOptions, FileAttributes, ShareAccess, ImpersonationLevel, CreateDisposition, FilePipePrinterAccessMask
 import os
 import uuid
+from utils.retry_utils import with_retries
 
 def smb_get(remote_file_path, local_file_path, username=None, password=None, domain=None):
     """Gets a file from a remote host using the SMB protocol."""
-    try:
+    def smb_get_operation():
         # Parse the remote SMB path
         parts = remote_file_path.split("\\")
         server = parts[2]
@@ -43,6 +44,9 @@ def smb_get(remote_file_path, local_file_path, username=None, password=None, dom
         with open(local_file_path, "wb") as f:
             f.write(file_data)
 
-        return f"Successfully got {remote_file_path} to {local_file_path} on {server}"
+        return f"Successfully downloaded {remote_file_path} to {local_file_path} from {server}"
+
+    try:
+        return with_retries(smb_get_operation)
     except Exception as e:
         return f"Error: {str(e)}"

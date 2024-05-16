@@ -4,10 +4,11 @@ from smbprotocol.tree import TreeConnect
 from smbprotocol.open import Open, CreateOptions, FileAttributes, ShareAccess, ImpersonationLevel, CreateDisposition, FilePipePrinterAccessMask
 import os
 import uuid
+from utils.retry_utils import with_retries
 
 def smb_write(local_file_path, remote_smb_path, username=None, password=None, domain=None):
     """Writes a file to a remote host using the SMB protocol."""
-    try:
+    def smb_write_operation():
         # Parse the remote SMB path
         parts = remote_smb_path.split("\\")
         server = parts[2]
@@ -44,5 +45,8 @@ def smb_write(local_file_path, remote_smb_path, username=None, password=None, do
         file_open.close()
 
         return f"Successfully wrote {local_file_path} to {remote_smb_path} on {server}"
+
+    try:
+        return with_retries(smb_write_operation)
     except Exception as e:
         return f"Error: {str(e)}"
