@@ -1,7 +1,6 @@
 import time
 import itertools
 import os
-import requests
 import subprocess
 import re
 
@@ -18,6 +17,15 @@ RED = '\033[31m'
 BLUE = '\033[34m'
 RESET = '\033[0m'
 
+def file_exists_in_supabase(bucket_name, storage_path):
+    """Check if a file already exists in Supabase storage."""
+    folder_path = os.path.dirname(storage_path)
+    response = supabase.storage.from_(bucket_name).list(folder_path)
+    if isinstance(response, list):
+        for file in response:
+            if file['name'] == os.path.basename(storage_path):
+                return True
+    return False
 
 def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
     """Interactively send commands to a host and print the output."""
@@ -51,6 +59,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
+            print("  netexec <local_file> <arguments>  :: Upload and execute a .NET assembly on the remote host")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -176,6 +185,33 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 command_text = f"winrmexec {remote_host} {command}"
 
+        # Handle the new 'netexec' command
+        if command_text.startswith("netexec "):
+            try:
+                _, local_file, *arguments = command_text.split(maxsplit=2)
+                arguments = " ".join(arguments)  # Combine the arguments into a single string
+
+                # Check if the file already exists in Supabase storage
+                bucket_name = "files"
+                filename = os.path.basename(local_file)
+                storage_path = f"netexec/{filename}"
+
+                if not file_exists_in_supabase(bucket_name, storage_path):
+                    # Upload the file to Supabase
+                    with open(local_file, 'rb') as f:
+                        response = supabase.storage.from_(bucket_name).upload(storage_path, f)
+
+                    print(f"File uploaded and available at: {get_public_url(bucket_name, storage_path)}")
+                else:
+                    print(f"File already exists at: {get_public_url(bucket_name, storage_path)}")
+
+                # Send the netexec command to the agent
+                file_url = get_public_url(bucket_name, storage_path)
+                command_text = f"netexec {file_url} {arguments}"
+            except Exception as e:
+                print(f"{RED}Error:{RESET} {e}")
+                continue
+
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
 
@@ -185,7 +221,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if len(parts) < 3:
                 print(f"{RED}Error:{RESET} Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
                 continue
-        
+
         # Handle the new 'pwd' command
         if command_text == "pwd":
             command_text = "pwd"

