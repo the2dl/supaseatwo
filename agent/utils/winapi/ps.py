@@ -2,8 +2,9 @@ import ctypes
 import ctypes.wintypes as wintypes
 
 # Define necessary constants
-PROCESS_QUERY_INFORMATION = 0x0400
-PROCESS_VM_READ = 0x0010
+PROCESS_TERMINATE = 0x0001
+CREATE_NEW_CONSOLE = 0x00000010
+SW_HIDE = 0
 
 class PROCESSENTRY32(ctypes.Structure):
     _fields_ = [
@@ -17,6 +18,36 @@ class PROCESSENTRY32(ctypes.Structure):
         ("pcPriClassBase", ctypes.c_long),
         ("dwFlags", wintypes.DWORD),
         ("szExeFile", ctypes.c_char * wintypes.MAX_PATH),
+    ]
+
+class STARTUPINFO(ctypes.Structure):
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("lpReserved", wintypes.LPWSTR),
+        ("lpDesktop", wintypes.LPWSTR),
+        ("lpTitle", wintypes.LPWSTR),
+        ("dwX", wintypes.DWORD),
+        ("dwY", wintypes.DWORD),
+        ("dwXSize", wintypes.DWORD),
+        ("dwYSize", wintypes.DWORD),
+        ("dwXCountChars", wintypes.DWORD),
+        ("dwYCountChars", wintypes.DWORD),
+        ("dwFillAttribute", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("wShowWindow", wintypes.WORD),
+        ("cbReserved2", wintypes.WORD),
+        ("lpReserved2", ctypes.POINTER(ctypes.c_byte)),
+        ("hStdInput", wintypes.HANDLE),
+        ("hStdOutput", wintypes.HANDLE),
+        ("hStdError", wintypes.HANDLE)
+    ]
+
+class PROCESS_INFORMATION(ctypes.Structure):
+    _fields_ = [
+        ("hProcess", wintypes.HANDLE),
+        ("hThread", wintypes.HANDLE),
+        ("dwProcessId", wintypes.DWORD),
+        ("dwThreadId", wintypes.DWORD)
     ]
 
 def list_processes():
@@ -41,3 +72,46 @@ def grep_processes(pattern):
     filtered_processes = [all_processes[0], all_processes[1]]  # Keep the headers
     filtered_processes.extend([proc for proc in all_processes[2:] if pattern.lower() in proc.lower()])
     return filtered_processes
+
+def terminate_process(process_id):
+    """Terminates a process by its process ID."""
+    handle = ctypes.windll.kernel32.OpenProcess(PROCESS_TERMINATE, False, process_id)
+    if not handle:
+        error_code = ctypes.windll.kernel32.GetLastError()
+        return f"Failed to open process with PID {process_id}. Error code: {error_code}"
+    
+    success = ctypes.windll.kernel32.TerminateProcess(handle, 0)
+    if not success:
+        error_code = ctypes.windll.kernel32.GetLastError()
+        return f"Failed to terminate process with PID {process_id}. Error code: {error_code}"
+    
+    ctypes.windll.kernel32.CloseHandle(handle)
+    return f"Process with PID {process_id} terminated successfully."
+
+def run_process(executable_path):
+    """Launch a process using the Windows API."""
+    startupinfo = STARTUPINFO()
+    process_information = PROCESS_INFORMATION()
+
+    startupinfo.cb = ctypes.sizeof(STARTUPINFO)
+    startupinfo.dwFlags = 0x1
+    startupinfo.wShowWindow = SW_HIDE
+
+    success = ctypes.windll.kernel32.CreateProcessW(
+        None, 
+        executable_path, 
+        None, 
+        None, 
+        False, 
+        CREATE_NEW_CONSOLE, 
+        None, 
+        None, 
+        ctypes.byref(startupinfo), 
+        ctypes.byref(process_information)
+    )
+
+    if not success:
+        error_code = ctypes.windll.kernel32.GetLastError()
+        return f"Failed to launch process. Error code: {error_code}"
+    else:
+        return f"Process launched successfully with PID {process_information.dwProcessId}"

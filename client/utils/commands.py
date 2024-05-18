@@ -74,9 +74,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  upload <local_path> <remote_path> :: Upload a file to the asset")
             print("  ps                                :: List all processes")
             print("  ps grep <pattern>                 :: Filter processes by name (Windows API)")
-            print("  psrun <pattern>                   :: Start a new process via Powershell")
-            print("  cmdrun <pattern>                  :: Start a new process via cmd")
-            print("  kill                              :: Send a signal to terminate the agent")
+            print("  ps term <processid>               :: Terminate a process by its process ID")
+            print("  run <path_to_remote_file>         :: Launch a process via Windows API")
+            print("  psrun <path_to_remote_file>       :: Start a new process via Powershell")
+            print("  cmdrun <path_to_remote_file>      :: Start a new process via cmd")
             print("  ls <directory_path>               :: List contents of a directory")
             print("  whoami                            :: Display user information (on Windows /all)")
             print("  pwd                               :: Display current working directory")
@@ -85,6 +86,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
+            print("  kill                              :: Terminate the agent")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -125,6 +127,18 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             _, _, pattern = parts
             command_text = f"ps grep {pattern}"
 
+        # Handle 'ps term' command
+        elif command_text.startswith('ps term'):
+            parts = command_text.split(maxsplit=2)
+            if len(parts) < 3:
+                print("Invalid ps term command format. Use 'ps term <processid>'.")
+                continue
+            _, _, process_id = parts
+            if not process_id.isdigit():
+                print("Invalid ps term command format. Process ID must be a number.")
+                continue
+            command_text = f"ps term {process_id}"
+
         # psrun command
         elif command_text.startswith("psrun "):
             try:
@@ -158,6 +172,15 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         # Handle the new 'whoami' command
         elif command_text == "whoami":
             command_text = "whoami"
+
+        # Handle the new 'run' command
+        elif command_text.startswith("run"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid run command format. Use 'run <path_to_remote_file>'.")
+                continue
+            else:
+                command_text = f"run {parts[1]}"
 
         # Handle the new 'users' command
         users_match = re.match(r'users\s+"([^"]+)"', command_text, re.IGNORECASE)
