@@ -1,0 +1,7 @@
+bcrypt
+requests
+smbprotocol
+supabase
+pywin32
+pythonnet
+winrm
