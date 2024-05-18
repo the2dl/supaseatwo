@@ -13,8 +13,8 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/boac2.git
-    cd boac2
+    git clone https://github.com/yourusername/supaseatwo.git
+    cd supaseatwo
     ```
 
 2. Install the required Python packages:
@@ -88,6 +88,12 @@ The client script handles user authentication, file uploads, and command executi
 ### Agent
 
 The agent script provides utility functions for running commands, retrieving system information, and updating agent status.
+
+## Compile Agent (fix later)
+
+```
+`C:\Users\dan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\Scripts\pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\pywin32_system32\\pywintypes310.dll;." --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\win32\\lib\\win32timezone.py;." supaseatwo.py
+```
 
 ## Contributing
 
