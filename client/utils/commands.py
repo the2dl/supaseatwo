@@ -3,6 +3,7 @@ import itertools
 import os
 import subprocess
 import re
+import threading
 
 from .database import supabase, get_public_url
 from .download import download_file
@@ -26,6 +27,29 @@ def file_exists_in_supabase(bucket_name, storage_path):
             if file['name'] == os.path.basename(storage_path):
                 return True
     return False
+
+def check_for_completed_commands(command_id, hostname, printed_flag):
+    """Check if a previously issued command has completed."""
+    response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
+    command_info = response.data[0]
+    if command_info['status'] in ('Completed', 'Failed'):
+        if not printed_flag.is_set():
+            output = command_info.get('output', 'No output available')
+            if command_info['status'] == 'Failed':
+                print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
+            else:
+                print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
+            printed_flag.set()
+        return True
+    return False
+
+def background_check(command_id, hostname, completed_event, printed_flag):
+    """Background thread to check for late responses."""
+    while not completed_event.is_set():
+        time.sleep(10)
+        if check_for_completed_commands(command_id, hostname, printed_flag):
+            completed_event.set()
+            break
 
 def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
     """Interactively send commands to a host and print the output."""
@@ -269,8 +293,22 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         print(f"Command '{command_text}' added with ID {command_id}.")
         print("Waiting for the command to complete...", end="", flush=True)
 
+        completed_event = threading.Event()
+        printed_flag = threading.Event()
+        threading.Thread(target=background_check, args=(command_id, hostname, completed_event, printed_flag), daemon=True).start()
+
         first_pass = True
+        start_time = time.time()  # Track the start time
+        timeout_occurred = False
         while True:
+            if completed_event.is_set():
+                break
+
+            if time.time() - start_time > 60:  # Check if 1 minute has passed
+                print(f"\nCommand timeout. No response from {hostname} for 1 minute.")
+                timeout_occurred = True
+                break
+
             if not first_pass:  # Only show spinner after the first pass
                 for _ in range(10):
                     print(next(spinner), end="\b", flush=True)
@@ -283,9 +321,16 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
             # Check for command completion or failure
             if command_info['status'] in ('Completed', 'Failed'):
-                output = command_info.get('output', 'No output available')
-                if command_info['status'] == 'Failed':
-                    print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
-                else:
-                    print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
+                completed_event.set()
+                if not printed_flag.is_set():
+                    output = command_info.get('output', 'No output available')
+                    if command_info['status'] == 'Failed':
+                        print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
+                    else:
+                        print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
+                    printed_flag.set()
                 break  # Exit loop when command is done
+
+        # Print return to command prompt message only if timeout occurred
+        if timeout_occurred:
+            print(f"Returning to command prompt. You can check for command completion later.")
