@@ -72,7 +72,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  sleep <number>                    :: Set a custom timeout (ex. sleep 5)")
             print("  download <file_path>              :: Download a file from the asset")
             print("  upload <local_path> <remote_path> :: Upload a file to the asset")
-            print("  ps grep <pattern>                 :: Filter processes by name")
+            print("  ps                                :: List all processes")
+            print("  ps grep <pattern>                 :: Filter processes by name (Windows API)")
             print("  psrun <pattern>                   :: Start a new process via Powershell")
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
@@ -80,10 +81,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  whoami                            :: Display user information (on Windows /all)")
             print("  pwd                               :: Display current working directory")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
+            print("  netexec <local_file> <arguments>  :: Upload and execute a .NET assembly on the remote host")
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
-            print("  netexec <local_file> <arguments>  :: Upload and execute a .NET assembly on the remote host")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -111,17 +112,21 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
                 continue
 
-        # Handle specific commands with arguments
-        if command_text.startswith('ps grep'):
-            try:
-                _, _, pattern = command_text.split(maxsplit=2)
-                command_text = f"powershell -Command \"Get-Process | Where-Object {{$_.ProcessName -like '*{pattern}*'}}\""
-            except ValueError:
+        # Handle 'ps' command
+        if command_text == 'ps':
+            command_text = "ps"
+
+        # Handle 'ps grep' command
+        elif command_text.startswith('ps grep'):
+            parts = command_text.split(maxsplit=2)
+            if len(parts) < 3:
                 print("Invalid ps grep command format. Use 'ps grep <pattern>'.")
                 continue
+            _, _, pattern = parts
+            command_text = f"ps grep {pattern}"
 
         # psrun command
-        if command_text.startswith("psrun "):
+        elif command_text.startswith("psrun "):
             try:
                 _, command = command_text.split(maxsplit=1)
                 subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
@@ -132,7 +137,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
 
         # cmdrun command
-        if command_text.startswith("cmdrun "):
+        elif command_text.startswith("cmdrun "):
             try:
                 _, command = command_text.split(maxsplit=1)
                 subprocess.Popen(["cmd.exe", "/c", f"start {command}"])  # Use "/c" to close cmd after
@@ -143,7 +148,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
 
         # Handle the new 'ls' command
-        if command_text.startswith("ls"):
+        elif command_text.startswith("ls"):
             parts = command_text.split(maxsplit=1)
             if len(parts) == 1:
                 command_text = "ls ."  # Default to current directory if no path is provided
@@ -151,7 +156,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"ls {parts[1]}"
 
         # Handle the new 'whoami' command
-        if command_text == "whoami":
+        elif command_text == "whoami":
             command_text = "whoami"
 
         # Handle the new 'users' command
@@ -168,7 +173,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
 
         # Handle the new 'smb write' command
-        if command_text.startswith("smb write"):
+        elif command_text.startswith("smb write"):
             parts = command_text.split()
             if len(parts) < 4:
                 print("Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'.")
@@ -182,7 +187,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"smb write {local_file_path} {remote_smb_path}"
 
         # Handle the new 'smb get' command
-        if command_text.startswith("smb get"):
+        elif command_text.startswith("smb get"):
             parts = command_text.split()
             if len(parts) < 4:
                 print("Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'.")
@@ -196,7 +201,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"smb get {remote_file_path} {local_file_path}"
 
         # Handle the new 'winrmexec' command
-        if command_text.startswith("winrmexec "):
+        elif command_text.startswith("winrmexec "):
             parts = command_text.split()
             if len(parts) < 3:
                 print("Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
@@ -210,7 +215,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"winrmexec {remote_host} {command}"
 
         # Handle the new 'netexec' command
-        if command_text.startswith("netexec "):
+        elif command_text.startswith("netexec "):
             try:
                 _, local_file, *arguments = command_text.split(maxsplit=2)
                 arguments = " ".join(arguments)  # Combine the arguments into a single string

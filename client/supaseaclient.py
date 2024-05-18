@@ -23,8 +23,7 @@ RESET = '\033[0m'
 
 # Command mappings for shortcuts
 command_mappings = {
-    "psps": "powershell get-process",
-    "pspwd": "powershell pwd",
+#    "psps": "powershell get-process",
 
     # ... add more mappings as needed
 }
@@ -128,7 +127,7 @@ def get_host_status(hostname):
 
 def main():
 
-    print("\n                                               _                       ")
+    print("\n                                             _                       ")
     print("     o o o ____  _ _ __  __ _   ___ ___ __ _  | |___ __ _____ o o o    ")
     print("  o o o o (_-< || | '_ \/ _` | (_-</ -_) _` | |  _\ V  V / _ \ o o o o ")
     print("    o o o /__/\_,_| .__/\__,_| /__/\___\__,_|  \__|\_/\_/\___/ o o o   ")

