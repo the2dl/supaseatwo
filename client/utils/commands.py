@@ -82,7 +82,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  whoami                            :: Display user information (on Windows /all)")
             print("  pwd                               :: Display current working directory")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
-            print("  netexec <local_file> <arguments>  :: Upload and execute a .NET assembly on the remote host")
+            print("  netexec <local_file> <arguments>  :: Run a .NET assembly in-memory")
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
