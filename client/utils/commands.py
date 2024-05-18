@@ -76,7 +76,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  psrun <pattern>                   :: Start a new process via Powershell")
             print("  cmdrun <pattern>                  :: Start a new process via cmd")
             print("  kill                              :: Send a signal to terminate the agent")
-            print("  wls <directory_path>              :: List contents of a directory on Windows host via Windows API")
+            print("  ls <directory_path>               :: List contents of a directory")
             print("  whoami                            :: Display user information (on Windows /all)")
             print("  pwd                               :: Display current working directory")
             print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
@@ -142,13 +142,13 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print("Invalid cmdrun command format. Use 'cmdrun <path_to_executable_or_file>'")
                 continue
 
-        # Handle the new 'wls' command
-        if command_text.startswith("wls"):
+        # Handle the new 'ls' command
+        if command_text.startswith("ls"):
             parts = command_text.split(maxsplit=1)
             if len(parts) == 1:
-                command_text = "wls ."  # Default to current directory if no path is provided
+                command_text = "ls ."  # Default to current directory if no path is provided
             else:
-                command_text = f"wls {parts[1]}"
+                command_text = f"ls {parts[1]}"
 
         # Handle the new 'whoami' command
         if command_text == "whoami":
