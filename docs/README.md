@@ -1,5 +1,9 @@
 # Project Structure Overview
 
+## Install instructions
+
+* [Detailed install instructions](install.md): Full installation material to get supaseatwo functional.
+
 ## Client
 
 * [supaseaclient.py](supaseaclient.md): Main client script handling interactions with the Supabase backend.
