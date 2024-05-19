@@ -2,7 +2,7 @@
 
 ## Client
 
-* [supaseaclient.py](docs/supaseaclient.md): Main client script handling interactions with the Supabase backend.
+* [supaseaclient.py](supaseaclient.md): Main client script handling interactions with the Supabase backend.
 * utils/: Utility functions for the client side, including:
   * upload.py: Functions for uploading files.
   * database.py: Database interaction functions.
