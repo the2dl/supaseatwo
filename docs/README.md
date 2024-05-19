@@ -13,6 +13,7 @@
 ## Agent
 
 * utils/: Utility functions for the agent side, including:
+  * [supaseatwo.py](supaseatwo.md): Main agent script handling backend communications.
   * [retry_utils.py](retry_utils.md): Functions for retry logic.
   * [config.py](config.md): Configuration settings for the agent.
   * [system_info.py](system_info.md): Functions for retrieving system information.
