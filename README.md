@@ -32,51 +32,82 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
 ## Configuration
 
 1. **Supabase Configuration:**
-   - Set up your Supabase project and obtain the URL and API key.
+   - Sign up for a Supabase Free tier (unless you require more storage).
+   - Set up your Supabase project and obtain the URL and API key from settings.
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase credentials.
 
 2. **Supabase Tables:**
    - **Users Table:**
      ```sql
-     CREATE TABLE users (
-       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-       username TEXT UNIQUE NOT NULL,
-       password TEXT NOT NULL,
-       last_login TIMESTAMP
-     );
+  CREATE SEQUENCE users_id_seq;
+  
+  CREATE TABLE users (
+    id int4 PRIMARY KEY DEFAULT nextval('users_id_seq'),
+    username varchar,
+    password_hash varchar,
+    last_loggedin timestamptz
+  );
      ```
 
    - **Uploads Table:**
      ```sql
-     CREATE TABLE uploads (
-       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-       file_name TEXT NOT NULL,
-       file_url TEXT NOT NULL,
-       status TEXT,
-       created_at TIMESTAMP DEFAULT NOW()
-     );
+  CREATE TABLE uploads (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    hostname varchar,
+    local_path text,
+    remote_path text,
+    file_url text,
+    timestamp timestamptz DEFAULT now(),
+    status varchar DEFAULT 'pending'::character varying,
+    username text
+  );
      ```
 
-   - **Downloads Table:**
+  - **Settings Table:**
      ```sql
-     CREATE TABLE downloads (
-       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-       file_name TEXT NOT NULL,
-       file_url TEXT NOT NULL,
-       status TEXT,
-       created_at TIMESTAMP DEFAULT NOW()
-     );
+  CREATE TABLE settings (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    hostname text,
+    ip text,
+    os text,
+    timeout_interval int4 DEFAULT 30,
+    check_in text DEFAULT 'Checked-in'::text,
+    last_checked_in timestamp,
+    username text
+  );
      ```
 
-   - **Commands Table:**
+  - **Downloads Table:**
      ```sql
-     CREATE TABLE commands (
-       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-       command TEXT NOT NULL,
-       result TEXT,
-       status TEXT,
-       created_at TIMESTAMP DEFAULT NOW()
-     );
+  CREATE SEQUENCE downloads_id_seq;
+
+  CREATE TABLE downloads (
+    id int8 PRIMARY KEY DEFAULT nextval('downloads_id_seq'),
+    hostname varchar,
+    local_path text,
+    remote_path text,
+    file_url text,
+    timestamp timestamptz DEFAULT now(),
+    status varchar DEFAULT 'pending'::character varying,
+    username text
+  );
+
+     ```
+
+  - **Py2 Table:**
+     ```sql
+  CREATE TABLE py2 (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz DEFAULT now(),
+    command text,
+    status text DEFAULT 'Pending'::text,
+    output text,
+    hostname text,
+    ip text,
+    os text,
+    timeout_interval int8 DEFAULT 30,
+    username text
+  );
      ```
 
 ## Usage
