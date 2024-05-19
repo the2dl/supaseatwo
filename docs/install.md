@@ -158,10 +158,8 @@ CREATE TABLE settings (
 
 - **Client Side**:
   - Run the client script to handle user authentication, file uploads, and command execution.
-    ```python supaseaclient.py
-    ```
+    `python supaseaclient.py`
 
 - **Agent Side**:
   - Run the agent script to provide utility functions for running commands, retrieving system information, and updating agent status.
-    ```python supaseatwo.py
-    ```
+    `python supaseatwo.py`
