@@ -2,14 +2,11 @@ import os
 import mimetypes
 import requests
 from supabase import create_client, Client
-from .config import SUPABASE_URL, SUPABASE_KEY, bucket_name
+from .config import supabase, SUPABASE_URL, SUPABASE_KEY, bucket_name
 from .system_info import get_system_info
 from .retry_utils import with_retries
 
-# Initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-def handle_download_command(command_text, username, supabase: Client):
+def handle_download_command(command_text, username):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
@@ -80,11 +77,11 @@ def update_command_status(command_text, status, output=None):
     except Exception as e:
         print(f"Failed to update command status: {str(e)}")
 
-def download_from_supabase(file_url, remote_path, supabase_key, supabase: Client):
+def download_from_supabase(file_url, remote_path):
     """Downloads a file from Supabase storage and saves it locally."""
     headers = {
-        "apikey": supabase_key,
-        "Authorization": f"Bearer {supabase_key}",
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
     }
 
     local_directory = os.path.dirname(remote_path)
@@ -99,12 +96,12 @@ def download_from_supabase(file_url, remote_path, supabase_key, supabase: Client
     else:
         return False
 
-def fetch_pending_uploads(supabase: Client):
+def fetch_pending_uploads():
     """Fetches pending uploads from the 'uploads' table."""
     response = with_retries(lambda: supabase.table("uploads").select("*").eq("status", "pending").execute())
     return response
 
-def handle_upload_command(command_text, username, supabase: Client):
+def handle_upload_command(command_text, username):
     """Handle the 'upload' command by uploading the file to Supabase storage and updating the uploads table."""
     try:
         _, local_path, remote_path = command_text.split(maxsplit=2)

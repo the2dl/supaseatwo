@@ -1,14 +1,15 @@
-from supabase import Client
-from .config import SUPABASE_URL, SUPABASE_KEY
+from supabase import create_client
+from .config import supabase, SUPABASE_URL, SUPABASE_KEY
 from .retry_utils import with_retries
 
-supabase = Client(SUPABASE_URL, SUPABASE_KEY)
+# Initialize Supabase client
+# supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)  # This is redundant since we are importing it from config
 
-def fetch_pending_commands_for_hostname(hostname, supabase):  # Add supabase as an argument
+def fetch_pending_commands_for_hostname(hostname):
     """Fetch commands with status 'Pending' and a specific hostname."""
     return with_retries(lambda: supabase.table('py2').select('*').eq('status', 'Pending').eq('hostname', hostname).execute())
 
-def update_command_status(supabase, command_id, status, output='', hostname='', ip='', os='', username=''):
+def update_command_status(command_id, status, output='', hostname='', ip='', os='', username=''):
     """Updates the status of a command in the py2 table."""
     command_data = {
         'status': status,

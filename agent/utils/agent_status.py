@@ -3,7 +3,7 @@ import socket
 from .config import supabase
 from .retry_utils import with_retries
 
-def reset_agent_status(supabase):
+def reset_agent_status():
     """Reset the agent's status to 'Checked-In' at startup."""
     hostname = socket.gethostname()
 
@@ -16,7 +16,7 @@ def reset_agent_status(supabase):
     except Exception as e:
         logging.error(f"An error occurred while resetting agent status: {repr(e)}")
 
-def update_settings_status(supabase, hostname, status):
+def update_settings_status(hostname, status):
     """Update the check-in status of the hostname in the settings table."""
 
     def update_status():

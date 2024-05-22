@@ -11,9 +11,9 @@ from utils.retry_utils import with_retries
 logging.basicConfig(level=logging.WARN)
 
 if __name__ == "__main__":
-    reset_agent_status(supabase)
+    reset_agent_status()
     while True:
-        settings = with_retries(lambda: fetch_settings(supabase))
+        settings = with_retries(fetch_settings)
         if settings:
             timeout_interval, _ = settings
         else:
@@ -21,7 +21,7 @@ if __name__ == "__main__":
             timeout_interval = 10
             logging.warning("Using default timeout interval due to fetch_settings failure.")
 
-        with_retries(lambda: execute_commands(supabase))
+        with_retries(execute_commands)  # No need to pass supabase
 
         interval = random.randint(1, timeout_interval)
         time.sleep(interval)

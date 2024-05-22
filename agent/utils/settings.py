@@ -4,7 +4,7 @@ from .system_info import get_system_info
 from .config import supabase, SUPABASE_URL, SUPABASE_KEY, DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
 from .retry_utils import with_retries
 
-def fetch_settings(supabase):
+def fetch_settings():
     """Fetch the system settings from the settings table, or return default values."""
     hostname, ip, os_info = get_system_info()
     response = with_retries(lambda: supabase.table('settings').select('*').eq('hostname', hostname).limit(1).execute())

