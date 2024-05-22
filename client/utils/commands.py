@@ -61,7 +61,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
         # Check for empty command
         if not command_text:
-            print("Invalid command, please enter a command.")
+            print(f"{RED}Error:{RESET} Invalid command, please enter a command.")
             continue
 
         # Help command
@@ -122,7 +122,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith('ps grep'):
             parts = command_text.split(maxsplit=2)
             if len(parts) < 3:
-                print("Invalid ps grep command format. Use 'ps grep <pattern>'.")
+                print(f"{RED}Error:{RESET} Invalid ps grep command format. Use 'ps grep <pattern>'.")
                 continue
             _, _, pattern = parts
             command_text = f"ps grep {pattern}"
@@ -131,35 +131,35 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith('ps term'):
             parts = command_text.split(maxsplit=2)
             if len(parts) < 3:
-                print("Invalid ps term command format. Use 'ps term <processid>'.")
+                print(f"{RED}Error:{RESET} Invalid ps term command format. Use 'ps term <processid>'.")
                 continue
             _, _, process_id = parts
             if not process_id.isdigit():
-                print("Invalid ps term command format. Process ID must be a number.")
+                print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
 
         # psrun command
-        elif command_text.startswith("psrun "):
-            try:
-                _, command = command_text.split(maxsplit=1)
-                subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
-                print(f"Started process: {command}")
+        elif command_text.startswith("psrun"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) < 2:
+                print(f"{RED}Error:{RESET} Invalid psrun command format. Use 'psrun <path_to_remote_file>'.")
                 continue
-            except ValueError:
-                print("Invalid psrun command format. Use 'psrun <path_to_executable_or_file>'")
-                continue
+            _, command = parts
+            subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
+            print(f"Started process: {command}")
+            continue
 
         # cmdrun command
-        elif command_text.startswith("cmdrun "):
-            try:
-                _, command = command_text.split(maxsplit=1)
-                subprocess.Popen(["cmd.exe", "/c", f"start {command}"])  # Use "/c" to close cmd after
-                print(f"Started process: {command}")
+        elif command_text.startswith("cmdrun"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) < 2:
+                print(f"{RED}Error:{RESET} Invalid cmdrun command format. Use 'cmdrun <path_to_remote_file>'.")
                 continue
-            except ValueError:
-                print("Invalid cmdrun command format. Use 'cmdrun <path_to_executable_or_file>'")
-                continue
+            _, command = parts
+            subprocess.Popen(["cmd.exe", "/c", f"start {command}"])  # Use "/c" to close cmd after
+            print(f"Started process: {command}")
+            continue
 
         # Handle the new 'ls' command
         elif command_text.startswith("ls"):
@@ -183,23 +183,19 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"run {parts[1]}"
 
         # Handle the new 'users' command
-        users_match = re.match(r'users\s+"([^"]+)"', command_text, re.IGNORECASE)
-        if users_match:
-            group_name = users_match.group(1)
-            command_text = f'users "{group_name}"'
-        elif command_text.lower().startswith("users "):
+        elif command_text.startswith("users"):
             parts = command_text.split(maxsplit=1)
-            if len(parts) == 2:
-                command_text = f"users {parts[1]}"
-            else:
-                print("Invalid users command format. Use 'users <group_name>'.")
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid users command format. Use 'users <group_name>'.")
                 continue
+            else:
+                command_text = f"users {parts[1]}"
 
         # Handle the new 'smb write' command
         elif command_text.startswith("smb write"):
             parts = command_text.split()
             if len(parts) < 4:
-                print("Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'.")
+                print(f"{RED}Error:{RESET} Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'.")
                 continue
             local_file_path = parts[2]
             remote_smb_path = parts[3]
@@ -213,7 +209,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith("smb get"):
             parts = command_text.split()
             if len(parts) < 4:
-                print("Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'.")
+                print(f"{RED}Error:{RESET} Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'.")
                 continue
             remote_file_path = parts[2]
             local_file_path = parts[3]
@@ -227,7 +223,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith("winrmexec "):
             parts = command_text.split()
             if len(parts) < 3:
-                print("Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
+                print(f"{RED}Error:{RESET} Invalid winrmexec command format. Use 'winrmexec <remote_host> <command> [username password domain]'.")
                 continue
             remote_host = parts[1]
             command = parts[2]
@@ -237,32 +233,33 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 command_text = f"winrmexec {remote_host} {command}"
 
-        # Handle the new 'netexec' command
-        elif command_text.startswith("netexec "):
+        elif command_text.startswith("netexec"):
+            parts = command_text.split(maxsplit=2)  # Ensure this uses maxsplit=2
+            if len(parts) < 3:  # Make sure both the file and arguments are provided
+                print(f"{RED}Error:{RESET} Invalid netexec command format. Use 'netexec <local_file> <arguments>'. Refer to the help section by typing 'help'.")
+                continue  # Skip the rest of the loop and ask for a new command
+
+            _, local_file, arguments = parts
+
+            # Proceed with checking the file and preparing the command
+            bucket_name = "files"
+            filename = os.path.basename(local_file)
+            storage_path = f"netexec/{filename}"
+
             try:
-                _, local_file, *arguments = command_text.split(maxsplit=2)
-                arguments = " ".join(arguments)  # Combine the arguments into a single string
-
-                # Check if the file already exists in Supabase storage
-                bucket_name = "files"
-                filename = os.path.basename(local_file)
-                storage_path = f"netexec/{filename}"
-
                 if not file_exists_in_supabase(bucket_name, storage_path):
-                    # Upload the file to Supabase
                     with open(local_file, 'rb') as f:
                         response = supabase.storage.from_(bucket_name).upload(storage_path, f)
-
                     print(f"File uploaded and available at: {get_public_url(bucket_name, storage_path)}")
                 else:
                     print(f"File already exists at: {get_public_url(bucket_name, storage_path)}")
 
-                # Send the netexec command to the agent
                 file_url = get_public_url(bucket_name, storage_path)
                 command_text = f"netexec {file_url} {arguments}"
+                # Only at this point is the command_text ready to be sent to the agent and registered in the database
             except Exception as e:
                 print(f"{RED}Error:{RESET} {e}")
-                continue
+                continue  # Prevent erroneous commands from being processed further
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
@@ -292,7 +289,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
                 continue
             except (ValueError, IndexError):
-                print("Invalid sleep command format. Use 'sleep <number>'.")
+                print(f"{RED}Error:{RESET} Invalid sleep command format. Use 'sleep <number>'.")
                 continue
 
         # Upload command
@@ -302,7 +299,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 upload_file(hostname, local_path, remote_path, username)
                 continue
             except ValueError:
-                print("Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
+                print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
 
         # Insert command into the database
@@ -333,7 +330,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 break
 
             if time.time() - start_time > 60:  # Check if 1 minute has passed
-                print(f"\nCommand timeout. No response from {hostname} for 1 minute.")
+                print(f"\n{RED}Error:{RESET} Command timeout. No response from {hostname} for 1 minute.")
                 timeout_occurred = True
                 break
 
