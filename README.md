@@ -1,5 +1,7 @@
 # SupaSeaTwo
 
+![seatwo](seatwo.png)
+
 SupaSeaTwo is a Python application that facilitates interactions between a client and an agent via Supabase. It provides a robust interface for user authentication, file uploads/downloads, and command execution utilizing Supabase as the backend.
 
 ## Features
