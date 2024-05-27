@@ -1,3 +1,5 @@
+# commands.py
+
 import time
 import itertools
 import os
@@ -300,6 +302,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if linked_smb_ip == parts[3]:
                 linked_smb_ip = None
             command_text = f"unlink smb agent {parts[3]}"
+
+        # If linked to SMB agent, strip out 'smb ' prefix
+        if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
+            command_text = f"smb {command_text}"
 
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
