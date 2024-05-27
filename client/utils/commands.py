@@ -60,7 +60,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
     def get_prompt():
         if linked_smb_ip:
-            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{RED}{linked_smb_ip} SMB{RESET}) ~ "
+            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{RED}{linked_smb_ip} smb{RESET}) ~ "
         else:
             return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
 
