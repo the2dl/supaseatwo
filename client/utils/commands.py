@@ -121,6 +121,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
                 continue
 
+        # Check for "cmd" command first
+        if command_text.startswith("cmd"):
+            print(f"{RED}Error:{RESET} cmd is passed by default, enter the command you'd want to run after cmd.")
+            continue  # Go back to the beginning of the loop
+
         # Handle 'ps' command
         if command_text == 'ps':
             command_text = "ps"
