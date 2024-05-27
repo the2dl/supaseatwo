@@ -16,6 +16,8 @@ spinner = itertools.cycle(['|', '/', '-', '\\'])
 GREEN = '\033[32m'
 RED = '\033[31m'
 BLUE = '\033[34m'
+PURPLE = '\033[35m'  # Add purple for external IP
+LIGHT_GREY = '\033[38;5;250m'
 RESET = '\033[0m'
 
 def file_exists_in_supabase(bucket_name, storage_path):
@@ -38,7 +40,7 @@ def check_for_completed_commands(command_id, hostname, printed_flag):
             if command_info['status'] == 'Failed':
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
             else:
-                print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
+                print(f"\n\noutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
             printed_flag.set()
         return True
     return False
@@ -56,8 +58,13 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
     print(f"Commands are being issued by user: {username}")
 
+    external_ip = supabase.table("settings").select("external_ip").eq("hostname", hostname).execute().data
+    external_ip = external_ip[0].get('external_ip', 'unknown') if external_ip else 'unknown'
+
     while True:
-        command_text = input("\nEnter a command to send: ").strip().lower()
+        timestamp = time.strftime("%H:%M:%S")
+        prompt = f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
+        command_text = input(prompt).strip().lower()
 
         # Check for empty command
         if not command_text:
@@ -344,6 +351,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
             command_info = response.data[0]
 
+
             # Check for command completion or failure
             if command_info['status'] in ('Completed', 'Failed'):
                 completed_event.set()
@@ -352,7 +360,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     if command_info['status'] == 'Failed':
                         print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
                     else:
-                        print(f"\n\n{BLUE}Output:{RESET} from {GREEN}{hostname}{RESET}\n\n {output}")
+                        print(f"\n\noutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
                     printed_flag.set()
                 break  # Exit loop when command is done
 
