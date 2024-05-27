@@ -7,6 +7,9 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 DEFAULT_TIMEOUT = 30
 DEFAULT_CHECK_IN = "Checked-in"
 bucket_name = "files"
+# Setup your pipes
+PIPE_NAME_TEMPLATE = r'\\{ip_address}\pipe\wesleypipes'
+PIPENAME = r'\\.\pipe\wesleypipes'
 
 # Set the proxy environment variables
 proxies = requests.utils.get_environ_proxies(os.environ.get('https_proxy') or os.environ.get('http_proxy'))

