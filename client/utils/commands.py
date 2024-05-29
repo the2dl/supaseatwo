@@ -19,6 +19,30 @@ PURPLE = '\033[35m'
 LIGHT_GREY = '\033[38;5;250m'
 RESET = '\033[0m'
 
+def view_command_history(hostname):
+    """Fetch and display the command history for a specific host."""
+    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output').eq('hostname', hostname).order('created_at', desc=False).execute()
+    commands = response.data
+
+    if not commands:
+        print(f"\n{YELLOW}No command history available for {hostname}.{RESET}")
+        return
+
+    print(f"\n{GREEN}Command History for {hostname}:{RESET}")
+    for command in commands:
+        created_at = command['created_at']
+        username = command['username']
+        ip = command.get('ip', 'N/A')
+        cmd = command['command']
+        output = command['output']
+
+        print(f"\n{BLUE}Time:{RESET} {created_at}")
+        print(f"{BLUE}User:{RESET} {username}")
+        print(f"{BLUE}IP:{RESET} {ip}")
+        print(f"{BLUE}Command:{RESET} {cmd}")
+        print(f"{BLUE}Output:\n{RESET} {output}")
+        print(f"{PURPLE}{'-' * 50}{RESET}")
+
 def file_exists_in_supabase(bucket_name, storage_path):
     folder_path = os.path.dirname(storage_path)
     response = supabase.storage.from_(bucket_name).list(folder_path)

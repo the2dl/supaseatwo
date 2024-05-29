@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 # Import functions from the 'utils' package
 from utils import login
-from utils.commands import send_command_and_get_output
+from utils.commands import send_command_and_get_output, view_command_history
 from utils.download import list_and_download_files
 from utils.database import supabase
 
@@ -24,7 +24,6 @@ RESET = '\033[0m'
 # Command mappings for shortcuts
 command_mappings = {
 #    "psps": "powershell get-process",
-
     # ... add more mappings as needed
 }
 
@@ -145,7 +144,8 @@ def main():
         print("1. Interact")
         print("2. Exit to Host Selection")
         print("3. List Downloads")
-        print("4. Exit to Local Terminal")
+        print("4. View Command History")
+        print("5. Exit to Local Terminal")
 
         choice = input("\nEnter your choice: ")
         try:
@@ -157,6 +157,8 @@ def main():
             elif choice == 3:
                 list_and_download_files(hostname)
             elif choice == 4:
+                view_command_history(hostname)
+            elif choice == 5:
                 break
             else:
                 print("Invalid choice. Please try again.")
