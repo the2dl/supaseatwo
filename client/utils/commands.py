@@ -85,8 +85,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  ps grep <pattern>                 :: Filter processes by name (Windows API)")
             print("  ps term <processid>               :: Terminate a process by its process ID")
             print("  run <path_to_remote_file>         :: Launch a process via Windows API")
-            print("  psrun <path_to_remote_file>       :: Start a new process via Powershell")
-            print("  cmdrun <path_to_remote_file>      :: Start a new process via cmd")
             print("  ls <directory_path>               :: List contents of a directory")
             print("  whoami                            :: Display user information (on Windows /all)")
             print("  pwd                               :: Display current working directory")
@@ -98,6 +96,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("  link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
             print("  unlink smb agent <ip_address>     :: Unlink the SMB agent from the current host using the specified IP address")
             print("  kill                              :: Terminate the agent")
+            print("  hostname                          :: Retrieve the local hostname using the Windows API")
+            print("  nslookup <hostname>               :: Perform a DNS lookup for the given hostname using the Windows API")
             print("  exit                              :: Return to main menu\n")
             continue
 
@@ -150,32 +150,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
-
-        elif command_text.startswith("psrun"):
-            parts = command_text.split(maxsplit=1)
-            if len(parts) < 2:
-                print(f"{RED}Error:{RESET} Invalid psrun command format. Use 'psrun <path_to_remote_file>'.")
-                continue
-            _, command = parts
-            if linked_smb_ip:
-                command_text = f"smb psrun {command}"
-            else:
-                subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
-                print(f"Started process: {command}")
-            continue
-
-        elif command_text.startswith("cmdrun"):
-            parts = command_text.split(maxsplit=1)
-            if len(parts) < 2:
-                print(f"{RED}Error:{RESET} Invalid cmdrun command format. Use 'cmdrun <path_to_remote_file>'.")
-                continue
-            _, command = parts
-            if linked_smb_ip:
-                command_text = f"smb cmdrun {command}"
-            else:
-                subprocess.Popen(["cmd.exe", "/c", f"start {command}"])
-                print(f"Started process: {command}")
-            continue
 
         elif command_text.startswith("ls"):
             parts = command_text.split(maxsplit=1)
@@ -295,6 +269,17 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 linked_smb_ip = None
                 smb_hostname = None
             command_text = f"unlink smb agent {parts[3]}"
+
+        elif command_text == "hostname":
+            command_text = "hostname"
+
+        elif command_text.startswith("nslookup"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) < 2:
+                print(f"{RED}Error:{RESET} Invalid nslookup command format. Use 'nslookup <hostname>'.")
+                continue
+            _, host_to_lookup = parts
+            command_text = f"nslookup {host_to_lookup}"
 
         if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
             command_text = f"smb {command_text}"
