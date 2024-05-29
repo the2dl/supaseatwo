@@ -1,5 +1,3 @@
-# commands.py
-
 import time
 import itertools
 import os
@@ -118,7 +116,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
                     continue
                 _, file_path = parts
-                download_file(hostname, file_path, username)
+                if linked_smb_ip:
+                    command_text = f"smb download {file_path}"
+                else:
+                    download_file(hostname, file_path, username)
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
@@ -156,8 +157,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid psrun command format. Use 'psrun <path_to_remote_file>'.")
                 continue
             _, command = parts
-            subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
-            print(f"Started process: {command}")
+            if linked_smb_ip:
+                command_text = f"smb psrun {command}"
+            else:
+                subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{command}'"])
+                print(f"Started process: {command}")
             continue
 
         elif command_text.startswith("cmdrun"):
@@ -166,8 +170,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid cmdrun command format. Use 'cmdrun <path_to_remote_file>'.")
                 continue
             _, command = parts
-            subprocess.Popen(["cmd.exe", "/c", f"start {command}"])
-            print(f"Started process: {command}")
+            if linked_smb_ip:
+                command_text = f"smb cmdrun {command}"
+            else:
+                subprocess.Popen(["cmd.exe", "/c", f"start {command}"])
+                print(f"Started process: {command}")
             continue
 
         elif command_text.startswith("ls"):
@@ -321,7 +328,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith("upload"):
             try:
                 _, local_path, remote_path = command_text.split(maxsplit=2)
-                upload_file(hostname, local_path, remote_path, username)
+                if linked_smb_ip:
+                    command_text = f"smb upload {local_path} {remote_path}"
+                else:
+                    upload_file(hostname, local_path, remote_path, username)
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")

