@@ -4,7 +4,6 @@ import random
 from utils.agent_status import reset_agent_status, update_settings_status
 from utils.settings import fetch_settings
 from utils.command_execution import execute_commands
-from utils.config import supabase
 from utils.retry_utils import with_retries
 
 # Configure logging
