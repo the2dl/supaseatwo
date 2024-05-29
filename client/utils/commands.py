@@ -17,11 +17,15 @@ RED = '\033[31m'
 BLUE = '\033[34m'
 PURPLE = '\033[35m'
 LIGHT_GREY = '\033[38;5;250m'
+YELLOW = '\033[33m'
 RESET = '\033[0m'
 
 def view_command_history(hostname):
-    """Fetch and display the command history for a specific host."""
-    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output').eq('hostname', hostname).order('created_at', desc=False).execute()
+    """Fetch and display the command history for a specific host and its SMB agents."""
+    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost').or_(
+        f"hostname.eq.{hostname},smbhost.eq.{hostname}"
+    ).order('created_at', desc=False).execute()
+
     commands = response.data
 
     if not commands:
@@ -29,6 +33,7 @@ def view_command_history(hostname):
         return
 
     print(f"\n{GREEN}Command History for {hostname}:{RESET}")
+
     for command in commands:
         created_at = command['created_at']
         username = command['username']
@@ -36,11 +41,20 @@ def view_command_history(hostname):
         cmd = command['command']
         output = command['output']
 
-        print(f"\n{BLUE}Time:{RESET} {created_at}")
-        print(f"{BLUE}User:{RESET} {username}")
-        print(f"{BLUE}IP:{RESET} {ip}")
-        print(f"{BLUE}Command:{RESET} {cmd}")
-        print(f"{BLUE}Output:\n{RESET} {output}")
+        # Use smbhost if it exists, otherwise use hostname
+        if command.get('smbhost'):
+            exec_hostname = command['smbhost']
+            color = RED  # Set color to red for SMB host
+        else:
+            exec_hostname = command['hostname']
+            color = RESET
+
+        print(f"\n{color}Time:{RESET} {created_at}")
+        print(f"{color}User:{RESET} {username}")
+        print(f"{color}IP:{RESET} {ip}")
+        print(f"{color}Hostname:{RESET} {exec_hostname}")
+        print(f"{color}Command:{RESET} {cmd}")
+        print(f"{color}Output:{RESET} {output}")
         print(f"{PURPLE}{'-' * 50}{RESET}")
 
 def file_exists_in_supabase(bucket_name, storage_path):
