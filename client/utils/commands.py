@@ -1,7 +1,6 @@
 import time
 import itertools
 import os
-import subprocess
 import threading
 
 from .database import supabase, get_public_url
@@ -73,11 +72,12 @@ def file_exists_in_supabase(bucket_name, storage_path):
     return False
 
 def check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
-    response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
+    response = supabase.table('py2').select('status', 'command', 'output').eq('id', command_id).execute()
     command_info = response.data[0]
     if command_info['status'] in ('Completed', 'Failed'):
         if not printed_flag.is_set():
             output = command_info.get('output', 'No output available')
+            cmd = command_info.get('command', 'No command available')
             display_hostname = smbhost if smbhost else hostname
             if command_info['status'] == 'Failed':
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
@@ -86,7 +86,7 @@ def check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
 
             # Generate AI summary if enabled
             if AI_SUMMARY:
-                ai_summary = generate_summary(output)
+                ai_summary = generate_summary(cmd, output)
                 if ai_summary:
                     print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
                     supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
@@ -411,7 +411,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     time.sleep(0.1)
             first_pass = False
 
-            response = supabase.table('py2').select('status', 'output', 'smbhost').eq('id', command_id).execute()
+            response = supabase.table('py2').select('status', 'command', 'output', 'smbhost').eq('id', command_id).execute()
             command_info = response.data[0]
 
             if command_info['status'] in ('Completed', 'Failed'):
@@ -419,6 +419,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 if not printed_flag.is_set():
                     smb_hostname = command_info.get('smbhost', smb_hostname)
                     output = command_info.get('output', 'No output available')
+                    cmd = command_info.get('command', 'No command available')
                     display_hostname = smb_hostname if smb_hostname else hostname
                     if command_info['status'] == 'Failed':
                         print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
@@ -427,7 +428,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
                     # Generate AI summary if enabled
                     if AI_SUMMARY:
-                        ai_summary = generate_summary(output)
+                        ai_summary = generate_summary(cmd, output)
                         if ai_summary:
                             print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
                             supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
