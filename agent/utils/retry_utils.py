@@ -8,7 +8,15 @@ def with_retries(func, initial_backoff=1.0, max_backoff=120.0, fixed_backoff=30.
     while True:
         try:
             return func()
-        except (httpx.RequestError, httpx.ConnectTimeout) as e:
+        except (
+            httpx.RequestError,
+            httpx.ConnectTimeout,
+            httpx.ReadTimeout,
+            httpx.WriteTimeout,
+            httpx.PoolTimeout,
+            httpx.RemoteProtocolError,
+            httpx.HTTPStatusError
+        ) as e:
             if total_wait_time < max_backoff:
                 wait_time = initial_backoff * (2 ** retries)
                 wait_time = min(wait_time, max_backoff - total_wait_time)

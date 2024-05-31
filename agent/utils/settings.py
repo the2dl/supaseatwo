@@ -8,7 +8,7 @@ from .retry_utils import with_retries
 def get_external_ip():
     """Get the external IP address of the agent by querying ipinfo.io."""
     try:
-        response = httpx.get('https://ipinfo.io')
+        response = with_retries(lambda: httpx.get('https://ipinfo.io'))
         if response.status_code == 200:
             ip_info = response.json()
             return ip_info.get('ip')
@@ -36,7 +36,7 @@ def fetch_settings():
         # Fetch external IP if not already stored
         if not external_ip:
             external_ip = get_external_ip()
-            if (external_ip):
+            if external_ip:
                 try:
                     with_retries(lambda: supabase.table('settings').update({
                         'external_ip': external_ip
