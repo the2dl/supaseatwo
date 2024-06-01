@@ -9,6 +9,7 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
 - **User Authentication:** Secure user login with bcrypt hashing.
 - **File Uploads and Downloads:** Seamless upload and download of files via Supabase storage.
 - **Command Execution:** Execute commands on the agent using native Windows API functions.
+- **Shellcode Injection:** Execute shellcode from on-machine or in memory, both execute into explorer.exe.
 - **Status Updates:** Real-time updates of agent status.
 
 ## Installation
@@ -71,6 +72,7 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         hostname text,
         ip text,
+        external_ip text,
         os text,
         timeout_interval int4 DEFAULT 30,
         check_in text DEFAULT 'Checked-in'::text,
@@ -106,6 +108,8 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
         hostname text,
         ip text,
         os text,
+        smbhost text,
+        ai_summary text,
         timeout_interval int8 DEFAULT 30,
         username text
       );
