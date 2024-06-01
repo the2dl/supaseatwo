@@ -19,8 +19,8 @@
    - Open Command Prompt or PowerShell.
    - Run the following command to clone the repository:
      ```sh
-     git clone https://github.com/yourusername/boac2.git
-     cd boac2
+     git clone https://github.com/the2dl/supaseatwo.git
+     cd supaseatwo
      ```
 
 4. **Set Up a Virtual Environment**
@@ -32,12 +32,14 @@
 
 5. **Install Dependencies**
    - Run the following command to install the required dependencies:
+   Windows:
      ```sh
      pip install -r requirements-windows.txt
      ```
 
 6. **Configure and signup for Supabase**
    - Signup for Supabase Free Tier
+   - Optional: Setup custom domain to ensure supabase isn't blocked by default corporate proxy
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase URL and API key.
 
 7. **Set Up Supabase Tables**
@@ -66,8 +68,8 @@
    - Open a terminal.
    - Run the following command to clone the repository:
      ```sh
-     git clone https://github.com/yourusername/boac2.git
-     cd boac2
+     git clone https://github.com/the2dl/supaseatwo.git
+     cd supaseatwo
      ```
 
 4. **Set Up a Virtual Environment**
@@ -85,6 +87,7 @@
 
 6. **Configure and signup for Supabase**
    - Signup for Supabase Free Tier
+   - Optional: Setup custom domain to ensure supabase isn't blocked by default corporate proxy
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase URL and API key.
 
 7. **Set Up Supabase Tables**
@@ -146,10 +149,29 @@ CREATE TABLE settings (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     hostname text,
     ip text,
+    external_ip text,
     os text,
     timeout_interv int4 DEFAULT 30,
     check_in text DEFAULT 'Checked-in'::text,
     last_checked_in timestamp,
+    username text
+);
+```
+
+#### py2 Table
+```sql
+CREATE TABLE py2 (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz DEFAULT now(),
+    command text,
+    status text DEFAULT 'Pending'::text,
+    output text,
+    hostname text,
+    ip text,
+    os text,
+    smbhost text,
+    ai_summary text,
+    timeout_interval int8 DEFAULT 30,
     username text
 );
 ```
@@ -163,3 +185,12 @@ CREATE TABLE settings (
 - **Agent Side**:
   - Run the agent script to provide utility functions for running commands, retrieving system information, and updating agent status.
     `python supaseatwo.py`
+
+## Compile Agent (HTTPS and SMB)
+
+```
+pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" supaseatwo.py
+```
+```
+pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" smb_agent.py
+```
