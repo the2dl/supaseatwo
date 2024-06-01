@@ -151,6 +151,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user")
             print(" revert_to_self                :: Revert to the original security context")
             print(" pth <username> <ntlm_hash> [domain] [command] :: Perform Pass-the-Hash attack and run a command")
+            print(" spn_enum                      :: Retrieve Kerberos tickets for all service accounts")
             print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
             print(" smb write <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
             print(" smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
@@ -248,6 +249,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
+
+        elif command_text == "spn_enum":
+            command_text = "spn_enum"
 
         elif command_text.startswith("mkdir"):
             parts = command_text.split(maxsplit=1)

