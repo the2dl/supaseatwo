@@ -139,6 +139,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" mv <source> <destination>     :: Move a file or directory")
             print(" cp <source> <destination>     :: Copy a file or directory")
             print(" mkdir <directory_path>        :: Create a new directory")
+            print(" cd <directory_path>           :: Change current directory")
             print(" rm <path>                     :: Remove a file or directory")
             print(" whoami                        :: Display user information (on Windows /all)")
             print(" pwd                           :: Display current working directory")
@@ -241,6 +242,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
+
+        elif command_text.startswith("cd"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid cd command format. Use 'cd <directory_path>'.")
+                continue
+            else:
+                command_text = f"cd {parts[1]}"
 
         elif command_text.startswith("injectshellcode"):
             parts = command_text.split(maxsplit=1)

