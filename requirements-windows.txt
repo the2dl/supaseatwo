@@ -5,3 +5,4 @@ supabase
 pywin32
 pythonnet
 winrm
+openai
