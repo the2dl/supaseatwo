@@ -130,28 +130,31 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print("\nAvailable Shortcut Commands:")
             for shortcut, command in command_mappings.items():
                 print(f" {shortcut:<10}        :: {command}")
-            print(" sleep <number>          :: Set a custom timeout (ex. sleep 5)")
-            print(" download <file_path>       :: Download a file from the asset")
+            print(" sleep <number>                :: Set a custom timeout (ex. sleep 5)")
+            print(" ps                            :: List all processes")
+            print(" ps grep <pattern>             :: Filter processes by name")
+            print(" ps term <processid>           :: Terminate a process by its process ID")
+            print(" run <path_to_remote_file>     :: Launch a process")
+            print(" ls <directory_path>           :: List contents of a directory")
+            print(" mv <source> <destination>     :: Move a file or directory")
+            print(" cp <source> <destination>     :: Copy a file or directory")
+            print(" mkdir <directory_path>        :: Create a new directory")
+            print(" rm <path>                     :: Remove a file or directory")
+            print(" whoami                        :: Display user information (on Windows /all)")
+            print(" pwd                           :: Display current working directory")
+            print(" hostname                      :: Retrieve the local hostname")
+            print(" nslookup <hostname>           :: Perform a DNS lookup for the given hostname")
+            print(" download <file_path>          :: Download a file from the asset")
             print(" upload <local_path> <remote_path> :: Upload a file to the asset")
-            print(" ps                :: List all processes")
-            print(" ps grep <pattern>         :: Filter processes by name (Windows API)")
-            print(" ps term <processid>        :: Terminate a process by its process ID")
-            print(" run <path_to_remote_file>     :: Launch a process via Windows API")
-            print(" ls <directory_path>        :: List contents of a directory")
-            print(" mkdir <directory_path>     :: Create a new directory")
-            print(" whoami              :: Display user information (on Windows /all)")
-            print(" pwd                :: Display current working directory")
-            print(" users <group_name>        :: List users in the specified group on Windows host via Windows API")
+            print(" users <group_name>            :: List users in the specified group on Windows host")
             print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
             print(" smb write <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
-            print(" smb get <remote_file_path> <local_file_path> [username password domain] :: Get a file from a remote host via SMB protocol")
+            print(" smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
             print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
-            print(" link smb agent <ip_address> [username password domain] :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
-            print(" unlink smb agent <ip_address>   :: Unlink the SMB agent from the current host using the specified IP address")
-            print(" kill               :: Terminate the agent")
-            print(" hostname             :: Retrieve the local hostname using the Windows API")
-            print(" nslookup <hostname>        :: Perform a DNS lookup for the given hostname using the Windows API")
-            print(" exit               :: Return to main menu\n")
+            print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
+            print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
+            print(" kill                          :: Terminate the agent")
+            print(" exit                          :: Return to main menu\n")
             continue
 
         if command_text == 'exit':
@@ -211,6 +214,30 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
+
+        elif command_text.startswith("rm"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid rm command format. Use 'rm <path>'.")
+                continue
+            else:
+                command_text = f"rm {parts[1]}"
+
+        elif command_text.startswith("cp"):
+            parts = command_text.split(maxsplit=2)
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid cp command format. Use 'cp <source> <destination>'.")
+                continue
+            else:
+                command_text = f"cp {parts[1]} {parts[2]}"
+
+        elif command_text.startswith("mv"):
+            parts = command_text.split(maxsplit=2)
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid mv command format. Use 'mv <source> <destination>'.")
+                continue
+            else:
+                command_text = f"mv {parts[1]} {parts[2]}"
 
         elif command_text.startswith("ls"):
             parts = command_text.split(maxsplit=1)

