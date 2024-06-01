@@ -4,4 +4,4 @@
 This module provides functions for injecting shellcode into a process.
 
 ## Functions:
-* `inject_shellcode`: Injects shellcode into a specified process.
+* `inject_shellcode`: Injects shellcode into explorer.exe.
