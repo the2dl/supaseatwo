@@ -26,6 +26,8 @@
   * [system_info.py](system_info.md): Functions for retrieving system information.
   * [agent_status.py](agent_status.md): Functions for updating agent status.
   * [settings.py](settings.md): Configuration settings for the agent.
+  * [commands.py](agent_commands.md): Command execution functions for the agent.
+  * [file_operations.py](file_operations.md): Handle file uploads and downloads, interacting with Supabase storage, and managing command statuses.
       * winapi/: Native Windows API functions, including:
       * [run.py](run.md): Function to run commands.
       * [smb_write.py](smb_write.md): SMB write functions.
