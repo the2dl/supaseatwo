@@ -150,8 +150,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" users <group_name>            :: List users in the specified group on Windows host")
             print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user")
             print(" revert_to_self                :: Revert to the original security context")
-            print(" pth <username> <ntlm_hash> [domain] [command] :: Perform Pass-the-Hash attack and run a command")
-            print(" spn_enum                      :: Retrieve Kerberos tickets for all service accounts")
             print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
             print(" smb write <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
             print(" smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
@@ -220,17 +218,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         if command_text == 'ps':
             command_text = "ps"
 
-        elif command_text.startswith("pth"):
-            parts = command_text.split(maxsplit=4)
-            if len(parts) < 3:
-                print(f"{RED}Error:{RESET} Invalid pth command format. Use 'pth <username> <ntlm_hash> [domain] [command]'.")
-                continue
-            username = parts[1]
-            ntlm_hash = parts[2]
-            domain = parts[3] if len(parts) > 3 else ''
-            command = parts[4] if len(parts) > 4 else 'cmd.exe'
-            command_text = f"pth {username} {ntlm_hash} {domain} {command}"
-
         elif command_text.startswith('ps grep'):
             parts = command_text.split(maxsplit=2)
             if len(parts) < 3:
@@ -249,9 +236,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
-
-        elif command_text == "spn_enum":
-            command_text = "spn_enum"
 
         elif command_text.startswith("mkdir"):
             parts = command_text.split(maxsplit=1)
