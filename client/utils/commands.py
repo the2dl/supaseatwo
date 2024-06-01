@@ -138,6 +138,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" ps term <processid>        :: Terminate a process by its process ID")
             print(" run <path_to_remote_file>     :: Launch a process via Windows API")
             print(" ls <directory_path>        :: List contents of a directory")
+            print(" mkdir <directory_path>     :: Create a new directory")
             print(" whoami              :: Display user information (on Windows /all)")
             print(" pwd                :: Display current working directory")
             print(" users <group_name>        :: List users in the specified group on Windows host via Windows API")
@@ -202,6 +203,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
+
+        elif command_text.startswith("mkdir"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid mkdir command format. Use 'mkdir <directory_path>'.")
+                continue
+            else:
+                command_text = f"mkdir {parts[1]}"
 
         elif command_text.startswith("ls"):
             parts = command_text.split(maxsplit=1)

