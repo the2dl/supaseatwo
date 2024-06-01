@@ -16,8 +16,11 @@
 
 ## Agent
 
+* [supaseatwo.py](supaseatwo.md): Main agent script handling backend communications.
+* [smb_agent.py](smb_agent.md): SMB agent script handling various commands and file operations.
 * utils/: Utility functions for the agent side, including:
-  * [supaseatwo.py](supaseatwo.md): Main agent script handling backend communications.
+  * [command_execution.py](command_execution.md): Command execution and management functions.
+  * [ai_summary.py](ai_summary.md): Functions for generating AI-based summaries of command outputs.
   * [retry_utils.py](retry_utils.md): Functions for retry logic.
   * [config.py](config.md): Configuration settings for the agent.
   * [system_info.py](system_info.md): Functions for retrieving system information.
@@ -36,3 +39,14 @@
       * [smb_get.py](smb_get.md): SMB get functions.
       * [ps.py](ps.md): Functions to list processes.
       * [winrm_execute.py](winrm_execute.md): Functions to execute commands via WinRM.
+      * [mv.py](mv.md): Functions to move files.
+      * [load_shellcode_from_url.py](load_shellcode_from_url.md): Functions to load shellcode from a URL.
+      * [cp.py](cp.md): Functions to copy files.
+      * [rm.py](rm.md): Functions to remove files.
+      * [mkdir.py](mkdir.md): Functions to create directories.
+      * [inject_shellcode.py](inject_shellcode.md): Functions to inject shellcode into a process.
+      * [hostname.py](hostname.md): Functions to retrieve the hostname of the machine.
+      * [nslookup.py](nslookup.md): Functions to perform DNS lookup.
+
+
+
