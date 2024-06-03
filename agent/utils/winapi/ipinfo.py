@@ -1,83 +1,75 @@
 # utils/winapi/ipinfo.py
 
 import ctypes
-import socket
-import struct
+from ctypes import wintypes
 
-# Define the necessary constants and structures
-MAX_ADAPTER_DESCRIPTION_LENGTH = 128
 MAX_ADAPTER_NAME_LENGTH = 256
 MAX_ADAPTER_ADDRESS_LENGTH = 8
-MIB_IF_TYPE_OTHER = 1
-MIB_IF_TYPE_ETHERNET = 6
-MIB_IF_TYPE_TOKENRING = 9
-MIB_IF_TYPE_FDDI = 15
-MIB_IF_TYPE_PPP = 23
-MIB_IF_TYPE_LOOPBACK = 24
-MIB_IF_TYPE_SLIP = 28
+MAX_ADAPTER_DESCRIPTION_LENGTH = 128
 
+# Define necessary structures
 class IP_ADDR_STRING(ctypes.Structure):
     pass
 
-LP_IP_ADDR_STRING = ctypes.POINTER(IP_ADDR_STRING)
-
 IP_ADDR_STRING._fields_ = [
-    ("next", LP_IP_ADDR_STRING),
-    ("ipAddress", ctypes.c_char * 16),
-    ("ipMask", ctypes.c_char * 16),
-    ("context", ctypes.c_ulong)
+    ("Next", ctypes.POINTER(IP_ADDR_STRING)),
+    ("IpAddress", wintypes.CHAR * 16),
+    ("IpMask", wintypes.CHAR * 16),
+    ("Context", wintypes.DWORD)
 ]
 
 class IP_ADAPTER_INFO(ctypes.Structure):
     pass
 
-LP_IP_ADAPTER_INFO = ctypes.POINTER(IP_ADAPTER_INFO)
-
 IP_ADAPTER_INFO._fields_ = [
-    ("next", LP_IP_ADAPTER_INFO),
-    ("comboIndex", ctypes.c_ulong),
-    ("adapterName", ctypes.c_char * MAX_ADAPTER_NAME_LENGTH + 4),
-    ("description", ctypes.c_char * MAX_ADAPTER_DESCRIPTION_LENGTH + 4),
-    ("addressLength", ctypes.c_uint),
-    ("address", ctypes.c_ubyte * MAX_ADAPTER_ADDRESS_LENGTH),
-    ("index", ctypes.c_ulong),
-    ("type", ctypes.c_uint),
-    ("dhcpEnabled", ctypes.c_uint),
-    ("currentIpAddress", LP_IP_ADDR_STRING),
-    ("ipAddressList", IP_ADDR_STRING),
-    ("gatewayList", IP_ADDR_STRING),
-    ("dhcpServer", IP_ADDR_STRING),
-    ("haveWins", ctypes.c_uint),
-    ("primaryWinsServer", IP_ADDR_STRING),
-    ("secondaryWinsServer", IP_ADDR_STRING),
-    ("leaseObtained", ctypes.c_ulong),
-    ("leaseExpires", ctypes.c_ulong)
+    ("Next", ctypes.POINTER(IP_ADAPTER_INFO)),
+    ("ComboIndex", wintypes.DWORD),
+    ("AdapterName", wintypes.CHAR * (MAX_ADAPTER_NAME_LENGTH + 4)),
+    ("Description", wintypes.CHAR * (MAX_ADAPTER_DESCRIPTION_LENGTH + 4)),
+    ("AddressLength", wintypes.UINT),
+    ("Address", wintypes.BYTE * MAX_ADAPTER_ADDRESS_LENGTH),
+    ("Index", wintypes.DWORD),
+    ("Type", wintypes.UINT),
+    ("DhcpEnabled", wintypes.UINT),
+    ("CurrentIpAddress", ctypes.POINTER(IP_ADDR_STRING)),
+    ("IpAddressList", IP_ADDR_STRING),
+    ("GatewayList", IP_ADDR_STRING),
+    ("DhcpServer", IP_ADDR_STRING),
+    ("HaveWins", wintypes.BOOL),
+    ("PrimaryWinsServer", IP_ADDR_STRING),
+    ("SecondaryWinsServer", IP_ADDR_STRING),
+    ("LeaseObtained", wintypes.ULONG),
+    ("LeaseExpires", wintypes.ULONG)
 ]
 
+# Load necessary DLLs
+iphlpapi = ctypes.WinDLL('iphlpapi.dll')
+
 def get_ip_info():
-    """Retrieve IP information using the Windows API."""
-    GetAdaptersInfo = ctypes.windll.iphlpapi.GetAdaptersInfo
-    GetAdaptersInfo.restype = ctypes.c_ulong
-    GetAdaptersInfo.argtypes = [LP_IP_ADAPTER_INFO, ctypes.POINTER(ctypes.c_ulong)]
+    """Retrieve IP configuration information."""
+    adapter_info_size = wintypes.ULONG()
+    iphlpapi.GetAdaptersInfo(None, ctypes.byref(adapter_info_size))
 
-    adapter_list = (IP_ADAPTER_INFO * 16)()  # Allow space for 16 adapters
-    buflen = ctypes.c_ulong(ctypes.sizeof(adapter_list))
+    adapter_info = ctypes.create_string_buffer(adapter_info_size.value)
+    iphlpapi.GetAdaptersInfo(ctypes.byref(adapter_info), ctypes.byref(adapter_info_size))
 
-    result = GetAdaptersInfo(ctypes.byref(adapter_list[0]), ctypes.byref(buflen))
-    if result != 0:
-        return f"Error: GetAdaptersInfo failed with error code {result}"
+    adapter = ctypes.cast(adapter_info, ctypes.POINTER(IP_ADAPTER_INFO)).contents
 
-    ip_info = []
-
-    for adapter in adapter_list:
-        if not adapter.adapterName:
+    info = []
+    while True:
+        info.append({
+            'AdapterName': adapter.AdapterName.decode(),
+            'Description': adapter.Description.decode(),
+            'IpAddress': adapter.IpAddressList.IpAddress.decode(),
+            'IpMask': adapter.IpAddressList.IpMask.decode(),
+            'Gateway': adapter.GatewayList.IpAddress.decode(),
+            'DhcpServer': adapter.DhcpServer.IpAddress.decode(),
+            'HaveWins': adapter.HaveWins,
+            'PrimaryWinsServer': adapter.PrimaryWinsServer.IpAddress.decode(),
+            'SecondaryWinsServer': adapter.SecondaryWinsServer.IpAddress.decode(),
+        })
+        if not adapter.Next:
             break
-        ip_info.append(f"Adapter Name: {adapter.adapterName.decode()}")
-        ip_info.append(f"Description: {adapter.description.decode()}")
-        ip_info.append(f"MAC Address: {'-'.join(f'{b:02X}' for b in adapter.address[:adapter.addressLength])}")
-        ip_info.append(f"IP Address: {adapter.ipAddressList.ipAddress.decode()}")
-        ip_info.append(f"IP Mask: {adapter.ipAddressList.ipMask.decode()}")
-        ip_info.append(f"Gateway: {adapter.gatewayList.ipAddress.decode()}")
-        ip_info.append("")
+        adapter = adapter.Next.contents
 
-    return "\n".join(ip_info)
+    return info
