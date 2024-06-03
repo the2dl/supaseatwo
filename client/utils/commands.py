@@ -141,13 +141,18 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" mkdir <directory_path>        :: Create a new directory")
             print(" cd <directory_path>           :: Change current directory")
             print(" rm <path>                     :: Remove a file or directory")
+            print(" get_ad_domain                 :: Retrieve the Active Directory domain name")
+            print(" get_dc_list                   :: Retrieve the list of domain controllers")
+            print(" get_logged_on_users           :: Retrieve the list of users currently logged on")
+            print(" get_installed_programs        :: Retrieve the list of installed programs")
+            print(" get_drive_info                :: Retrieve information about all the drives in the system")
             print(" whoami                        :: Display user information (on Windows /all)")
             print(" pwd                           :: Display current working directory")
             print(" hostname                      :: Retrieve the local hostname")
             print(" nslookup <hostname>           :: Perform a DNS lookup for the given hostname")
             print(" download <file_path>          :: Download a file from the asset")
             print(" upload <local_path> <remote_path> :: Upload a file to the asset")
-            print(" users <group_name>            :: List users in the specified group on Windows host")
+            print(" users <local|dom> <groupname> or <domain\group_name> :: List users in the specified local or domain group")
             print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user")
             print(" revert_to_self                :: Revert to the original security context")
             print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
@@ -244,7 +249,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
-                
+
         elif command_text.startswith("make_token"):
             parts = command_text.split(maxsplit=3)
             if len(parts) < 3:
@@ -317,12 +322,12 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"run {parts[1]}"
 
         elif command_text.startswith("users"):
-            parts = command_text.split(maxsplit=1)
-            if len(parts) == 1:
-                print(f"{RED}Error:{RESET} Invalid users command format. Use 'users <group_name>'.")
+            parts = command_text.split(' ', 2)
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid users command format. Use 'users <local|dom> <group_name>'.")
                 continue
-            else:
-                command_text = f"users {parts[1]}"
+            group_type, group_name = parts[1], parts[2]
+            command_text = f"users {group_type} {group_name}"
 
         elif command_text.startswith("smb write"):
             parts = command_text.split()
@@ -419,6 +424,21 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
         elif command_text == "hostname":
             command_text = "hostname"
+
+        elif command_text == "get_ad_domain":
+            command_text = "get_ad_domain"
+
+        elif command_text == "get_installed_programs":
+            command_text = "get_installed_programs"
+
+        elif command_text == "get_drive_info":
+            command_text = "get_drive_info"
+
+        elif command_text == "get_logged_on_users":
+            command_text = "get_logged_on_users"
+
+        elif command_text.startswith("get_dc_list"):
+            command_text = command_text
 
         elif command_text.startswith("nslookup"):
             parts = command_text.split(maxsplit=1)

