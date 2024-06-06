@@ -209,6 +209,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration] :: Create a scheduled task")
             print(" delete_scheduled_task <task_name> :: Delete a scheduled task")
             print(" get_scheduled_task_info <task_name> :: Retrieve information about a scheduled task")
+            print(" start_scheduled_task <task_name> :: Start a scheduled task")
             print(" view_history                  :: View the command history for the current host")
             print(" search_history <term>         :: Search the command history for the current host with a specific term")
             print(" kill                          :: Terminate the agent")
@@ -302,6 +303,13 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid ps term command format. Process ID must be a number.")
                 continue
             command_text = f"ps term {process_id}"
+
+        elif command_text.startswith("start_scheduled_task"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) != 2:
+                print(f"{RED}Error:{RESET} Invalid start_scheduled_task command format. Use 'start_scheduled_task <task_name>'.")
+                continue
+            command_text = f"start_scheduled_task {parts[1]}"
 
         elif command_text.startswith("mkdir"):
             parts = command_text.split(maxsplit=1)

