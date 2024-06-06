@@ -37,44 +37,62 @@ def fetch_agent_id_by_hostname(hostname):
         print(f"{RED}Error:{RESET} An error occurred while fetching agent_id for hostname {hostname}: {e}")
         return None
 
-def view_command_history(hostname):
-    """Fetch and display the command history for a specific host and its SMB agents."""
-    response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost', 'ai_summary').or_(
-        f"hostname.eq.{hostname},smbhost.eq.{hostname}"
-    ).order('created_at', desc=False).execute()
 
-    commands = response.data
+def view_command_history(hostname, search_term=None):
+    """Fetch and display the command history for a specific host and its SMB agents, optionally filtering by a search term."""
+    try:
+        print(f"{GREEN}Fetching command history for hostname: {hostname} with search term: {search_term}{RESET}")
 
-    if not commands:
-        print(f"\n{YELLOW}No command history available for {hostname}.{RESET}")
-        return
+        # Fetch all command history
+        response = supabase.table('py2').select(
+            'created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost', 'ai_summary'
+        ).or_(
+            f"hostname.eq.{hostname},smbhost.eq.{hostname}"
+        ).execute()
 
-    print(f"\n{GREEN}Command History for {hostname}:{RESET}")
+        # Check for response data
+        commands = response.data
+        if not commands:
+            print(f"\n{YELLOW}No command history available for {hostname}.{RESET}")
+            return
 
-    for command in commands:
-        created_at = command['created_at']
-        username = command['username']
-        ip = command.get('ip', 'N/A')
-        cmd = command['command']
-        output = command['output']
-        ai_summary = command.get('ai_summary', 'No summary available')
+        # Filter commands locally if search_term is provided
+        if search_term:
+            commands = [cmd for cmd in commands if search_term.lower() in (cmd.get('output', '')).lower()]
 
-        # Use smbhost if it exists, otherwise use hostname
-        if command.get('smbhost'):
-            exec_hostname = command['smbhost']
-            color = RED  # Set color to red for SMB host
-        else:
-            exec_hostname = command['hostname']
-            color = RESET
+        if not commands:
+            print(f"\n{YELLOW}No matches found for the search term '{search_term}' in command history for {hostname}.{RESET}")
+            return
 
-        print(f"\n{color}Time:{RESET} {created_at}")
-        print(f"{color}User:{RESET} {username}")
-        print(f"{color}IP:{RESET} {ip}")
-        print(f"{color}Hostname:{RESET} {exec_hostname}")
-        print(f"{color}Command:{RESET} {cmd}")
-        print(f"{color}Output:{RESET} {output}")
-        print(f"{color}AI Summary:{RESET} {ai_summary}")
-        print(f"{PURPLE}{'-' * 50}{RESET}")
+        print(f"\n{GREEN}Command History for {hostname}:{RESET}")
+
+        for command in commands:
+            created_at = command['created_at']
+            username = command['username']
+            ip = command.get('ip', 'N/A')
+            cmd = command['command']
+            output = command['output']
+            ai_summary = command.get('ai_summary', 'No summary available')
+
+            # Use smbhost if it exists, otherwise use hostname
+            if command.get('smbhost'):
+                exec_hostname = command['smbhost']
+                color = RED  # Set color to red for SMB host
+            else:
+                exec_hostname = command['hostname']
+                color = RESET
+
+            print(f"\n{color}Time:{RESET} {created_at}")
+            print(f"{color}User:{RESET} {username}")
+            print(f"{color}IP:{RESET} {ip}")
+            print(f"{color}Hostname:{RESET} {exec_hostname}")
+            print(f"{color}Command:{RESET} {cmd}")
+            print(f"{color}Output:{RESET} {output}")
+            print(f"{color}AI Summary:{RESET} {ai_summary}")
+            print(f"{PURPLE}{'-' * 50}{RESET}")
+
+    except Exception as e:
+        print(f"{RED}Error:{RESET} An error occurred while fetching command history: {e}")
 
 def file_exists_in_supabase(bucket_name, storage_path):
     folder_path = os.path.dirname(storage_path)
@@ -115,6 +133,7 @@ def background_check(command_id, agent_id, completed_event, printed_flag, smbhos
         if check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
             completed_event.set()
             break
+
 
 def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
     linked_smb_ip = None
@@ -190,6 +209,8 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration] :: Create a scheduled task")
             print(" delete_scheduled_task <task_name> :: Delete a scheduled task")
             print(" get_scheduled_task_info <task_name> :: Retrieve information about a scheduled task")
+            print(" view_history                  :: View the command history for the current host")
+            print(" search_history <term>         :: Search the command history for the current host with a specific term")
             print(" kill                          :: Terminate the agent")
             print(" exit                          :: Return to main menu\n")
             continue
@@ -201,6 +222,19 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         if command_text == 'kill':
             print(f"Sending kill command to terminate {GREEN}{hostname}{RESET} agent.")
             command_text = "kill"
+
+        if command_text == 'view_history':
+            view_command_history(hostname)
+            continue
+
+        if command_text.startswith('search_history'):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid search_history command format. Use 'search_history <term>'.")
+                continue
+            search_term = parts[1]
+            view_command_history(hostname, search_term)
+            continue
 
         if command_text.startswith("download"):
             try:

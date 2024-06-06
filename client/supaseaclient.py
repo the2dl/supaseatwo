@@ -143,8 +143,7 @@ def main():
         print("1. Interact")
         print("2. Exit to Host Selection")
         print("3. List Downloads")
-        print("4. View Command History")
-        print("5. Exit to Local Terminal")
+        print("4. Exit to Local Terminal")
 
         choice = input("\nEnter your choice: ")
         try:
@@ -156,8 +155,6 @@ def main():
             elif choice == 3:
                 list_and_download_files(hostname)
             elif choice == 4:
-                view_command_history(hostname)
-            elif choice == 5:
                 break
             else:
                 print("Invalid choice. Please try again.")
