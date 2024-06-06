@@ -23,8 +23,8 @@ RESET = '\033[0m'
 
 # Command mappings for shortcuts
 command_mappings = {
-#    "psps": "powershell get-process",
-    # ... add more mappings as needed
+  # "psps": "powershell get-process",
+  # ... add more mappings as needed
 }
 
 # Default sleep interval and check-in threshold
@@ -32,8 +32,10 @@ current_sleep_interval = 5
 CHECK_IN_THRESHOLD = timedelta(minutes=10)
 DEFAULT_TIMEOUT = 600
 
+# Add a setting to toggle AI summary feature
+
 def select_hostname():
-    while True:  # Loop to ensure valid selection or allow repeated attempts
+    while True:
         # Fetch current data from the database
         response = supabase.table('settings').select('hostname, last_checked_in, check_in, timeout_interval').execute()
         hosts = response.data
@@ -41,7 +43,7 @@ def select_hostname():
 
         if not hosts:
             print(f"\n{YELLOW}No hosts available, start an agent to utilize the client.{RESET}")
-            return None  # Return None if no hosts are available
+            return None
 
         print("\nList of Hosts:")
         for index, host in enumerate(hosts, start=1):
@@ -65,7 +67,6 @@ def select_hostname():
             color = RED if status == "dead" else YELLOW if status in ["likely dead", "no check-in info"] else GREEN
             print(f"{index}. {color}{hostname} ({status}){RESET}")
 
-        # Adding options to remove a host or exit
         print(f"{len(hosts) + 1}. Remove a host")
         print(f"{len(hosts) + 2}. Exit")
 
@@ -74,15 +75,15 @@ def select_hostname():
             if 1 <= choice <= len(hosts):
                 selected_host = hosts[choice - 1]['hostname']
                 print(f"You have selected {selected_host}.")
-                return selected_host  # Successfully return the selected hostname
+                return selected_host
             elif choice == len(hosts) + 1:
                 hostname_to_remove = remove_host(hosts)
                 if hostname_to_remove:
                     print(f"Host {hostname_to_remove} removed successfully.")
-                continue  # Continue the loop to allow further actions
+                continue
             elif choice == len(hosts) + 2:
                 print("Exiting...")
-                return None  # User chooses to exit
+                return None
             else:
                 print("Invalid selection. Please enter a number within the list range.")
         except ValueError:
@@ -90,7 +91,6 @@ def select_hostname():
 
 def remove_host(hosts):
     """Allows the user to select and remove a host from the database."""
-
     print("\nSelect a host to remove:")
     for index, host in enumerate(hosts, start=1):
         print(f"{index}. {host['hostname']}")
@@ -100,7 +100,6 @@ def remove_host(hosts):
         if 1 <= choice <= len(hosts):
             hostname_to_remove = hosts[choice - 1]['hostname']
 
-            # Delete host from the database
             response = supabase.table('settings').delete().match({'hostname': hostname_to_remove}).execute()
 
             if response.data:
@@ -110,7 +109,7 @@ def remove_host(hosts):
                     error_data = response.json()
                     error_message = error_data.get("message", "Unknown error")
                     print(f"Failed to remove host: {error_message}")
-                except ValueError:  # Catch JSON decoding errors
+                except ValueError:
                     print("Failed to remove host. Unexpected response format.")
         else:
             print("Invalid selection.")
@@ -163,11 +162,10 @@ def main():
             else:
                 print("Invalid choice. Please try again.")
 
-            # After processing the command, check the status of the host
             host_status = get_host_status(hostname)
             if host_status in ['dead', 'likely dead']:
                 print(f"Host {hostname} is {host_status}. Selecting a new host.")
-                hostname = select_hostname()  # Prompt to select a new host
+                hostname = select_hostname()
         except ValueError:
             print("Invalid input. Please enter a number.")
 

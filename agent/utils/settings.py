@@ -19,10 +19,18 @@ def get_external_ip():
         logging.error(f"An error occurred while getting the external IP address: {repr(e)}")
         return None
 
-def fetch_settings():
+def fetch_agent_id_by_hostname(hostname):
+    """Fetch the agent_id using the hostname."""
+    response = with_retries(lambda: supabase.table('settings').select('agent_id').eq('hostname', hostname).limit(1).execute())
+    data = response.data
+    if data:
+        return data[0]['agent_id']
+    return None
+
+def fetch_settings(agent_id):
     """Fetch the system settings from the settings table, or return default values."""
     hostname, ip, os_info = get_system_info()
-    response = with_retries(lambda: supabase.table('settings').select('*').eq('hostname', hostname).limit(1).execute())
+    response = with_retries(lambda: supabase.table('settings').select('*').eq('agent_id', agent_id).limit(1).execute())
     settings_data = response.data
 
     now = datetime.utcnow().isoformat() + "Z"  # Timestamp in UTC format
@@ -36,11 +44,11 @@ def fetch_settings():
         # Fetch external IP if not already stored
         if not external_ip:
             external_ip = get_external_ip()
-            if external_ip:
+            if (external_ip):
                 try:
                     with_retries(lambda: supabase.table('settings').update({
                         'external_ip': external_ip
-                    }).eq('hostname', hostname).execute())
+                    }).eq('agent_id', agent_id).execute())
                 except Exception as e:
                     logging.warning(f"Failed to update external IP: {e}")
 
@@ -48,16 +56,17 @@ def fetch_settings():
         try:
             with_retries(lambda: supabase.table('settings').update({
                 'last_checked_in': now
-            }).eq('hostname', hostname).execute())
+            }).eq('agent_id', agent_id).execute())
         except Exception as e:
             logging.warning(f"Failed to update last checked-in time: {e}")
 
         return timeout_interval, check_in_status
     else:
-        # Insert new system info if no record exists for this hostname
+        # Insert new system info if no record exists for this agent_id
         try:
             external_ip = get_external_ip()
             insert_data = {
+                'agent_id': agent_id,
                 'hostname': hostname,
                 'ip': ip,
                 'os': os_info,

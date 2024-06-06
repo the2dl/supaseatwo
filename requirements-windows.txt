@@ -4,5 +4,4 @@ smbprotocol
 supabase
 pywin32
 pythonnet
-winrm
-openai
+pywinrm

@@ -6,7 +6,7 @@ from .config import supabase, SUPABASE_URL, SUPABASE_KEY, bucket_name
 from .system_info import get_system_info
 from .retry_utils import with_retries
 
-def handle_download_command(command_text, username):
+def handle_download_command(command_text, username, agent_id, hostname):
     """Handle the 'download' command by uploading the file to Supabase storage and updating the downloads table."""
     try:
         _, file_path = command_text.split(maxsplit=1)
@@ -40,8 +40,8 @@ def handle_download_command(command_text, username):
             file_url = get_public_url(bucket_name, storage_path)
 
             # Insert download record into the database
-            hostname, _, _ = get_system_info()
             with_retries(lambda: supabase.table("downloads").insert({
+                "agent_id": agent_id,
                 "hostname": hostname,
                 "local_path": file_path,
                 "remote_path": storage_path,
@@ -101,7 +101,7 @@ def fetch_pending_uploads():
     response = with_retries(lambda: supabase.table("uploads").select("*").eq("status", "pending").execute())
     return response
 
-def handle_upload_command(command_text, username):
+def handle_upload_command(command_text, username, agent_id):
     """Handle the 'upload' command by uploading the file to Supabase storage and updating the uploads table."""
     try:
         _, local_path, remote_path = command_text.split(maxsplit=2)
@@ -125,6 +125,7 @@ def handle_upload_command(command_text, username):
             file_url = get_public_url(bucket_name, remote_path)
             # Update the uploads table
             with_retries(lambda: supabase.table("uploads").insert({
+                "agent_id": agent_id,
                 "local_path": local_path,
                 "remote_path": remote_path,
                 "file_url": file_url,

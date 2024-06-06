@@ -1,10 +1,10 @@
 import os
-import requests
+import mimetypes
 from datetime import datetime  # Import datetime module
 
 from .database import supabase, get_public_url
 
-def upload_file(hostname, local_path, remote_path, username):
+def upload_file(agent_id, hostname, local_path, remote_path, username):
     """Uploads a file to the specified host via Supabase storage."""
 
     bucket_name = "files"  # Name of the storage bucket in Supabase
@@ -12,7 +12,11 @@ def upload_file(hostname, local_path, remote_path, username):
         # Check if the local file exists
         if not os.path.exists(local_path):
             print(f"Error: Local file '{local_path}' not found.")
-            return
+            return "Failed", f"File does not exist: {local_path}"
+
+        if os.path.isdir(local_path):
+            print(f"Error: Invalid path, it is a directory: {local_path}")
+            return "Failed", f"Invalid path, it is a directory: {local_path}"
 
         filename = os.path.basename(local_path)  # Extract filename
         storage_path = f"uploads/{filename}"    # Path within the bucket
@@ -33,6 +37,7 @@ def upload_file(hostname, local_path, remote_path, username):
 
         # Store upload information in the database
         supabase.table("uploads").insert({
+            'agent_id': agent_id,
             'hostname': hostname,
             'local_path': local_path,
             'remote_path': remote_path,   # Store the full path for downloading
@@ -42,5 +47,8 @@ def upload_file(hostname, local_path, remote_path, username):
             'status': 'pending'  # Initially set status as pending
         }).execute()
 
+        return "Completed", f"File uploaded to {file_url}"
+
     except Exception as e:
         print(f"Upload failed: {e}")
+        return "Failed", f"An unexpected error occurred: {str(e)}"

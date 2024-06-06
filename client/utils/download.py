@@ -3,12 +3,13 @@ import requests
 import time
 from .database import supabase, SUPABASE_KEY
 
-def download_file(hostname, file_path, username):
+def download_file(agent_id, hostname, file_path, username):
     """Triggers the download process on the remote machine and stores the file in Supabase storage."""
 
     # Insert a new record into the py2 table in Supabase to trigger the download process on the remote machine.
     result = supabase.table('py2').insert({
-        'hostname': hostname,
+        'agent_id': agent_id,
+        'hostname': hostname,  # Ensure hostname is included
         'username': username,
         'command': f'download {file_path}',
         'status': 'Pending'
