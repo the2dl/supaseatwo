@@ -1,9 +1,16 @@
 import logging
 import httpx
 from datetime import datetime
+from cryptography.fernet import Fernet
 from .system_info import get_system_info
 from .config import supabase, DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
 from .retry_utils import with_retries
+
+# Suppress logs from httpx and supabase-py
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("supabase").setLevel(logging.WARNING)
+
+logging.basicConfig(level=logging.WARNING)
 
 def get_external_ip():
     """Get the external IP address of the agent by querying ipinfo.io."""
@@ -40,17 +47,31 @@ def fetch_settings(agent_id):
         timeout_interval = settings.get('timeout_interval', DEFAULT_TIMEOUT)
         check_in_status = settings.get('check_in', DEFAULT_CHECK_IN)
         external_ip = settings.get('external_ip')
+        encryption_key = settings.get('encryption_key')
 
         # Fetch external IP if not already stored
         if not external_ip:
             external_ip = get_external_ip()
-            if (external_ip):
+            if external_ip:
                 try:
                     with_retries(lambda: supabase.table('settings').update({
                         'external_ip': external_ip
                     }).eq('agent_id', agent_id).execute())
                 except Exception as e:
                     logging.warning(f"Failed to update external IP: {e}")
+
+        # Generate and store encryption key if not already stored
+        if not encryption_key:
+            encryption_key = Fernet.generate_key().decode()
+            logging.debug(f"Generated encryption key: {encryption_key}")
+            try:
+                with_retries(lambda: supabase.table('settings').update({
+                    'encryption_key': encryption_key
+                }).eq('agent_id', agent_id).execute())
+            except Exception as e:
+                logging.warning(f"Failed to update encryption key: {e}")
+        else:
+            logging.debug(f"Fetched existing encryption key: {encryption_key}")
 
         # Try updating the last checked-in time with error handling
         try:
@@ -60,11 +81,13 @@ def fetch_settings(agent_id):
         except Exception as e:
             logging.warning(f"Failed to update last checked-in time: {e}")
 
-        return timeout_interval, check_in_status
+        return timeout_interval, check_in_status, encryption_key
     else:
         # Insert new system info if no record exists for this agent_id
         try:
             external_ip = get_external_ip()
+            encryption_key = Fernet.generate_key().decode()
+            logging.debug(f"Generated encryption key for new agent: {encryption_key}")
             insert_data = {
                 'agent_id': agent_id,
                 'hostname': hostname,
@@ -74,6 +97,7 @@ def fetch_settings(agent_id):
                 'check_in': DEFAULT_CHECK_IN,
                 'last_checked_in': now,
                 'username': '',  # Default empty string for username
+                'encryption_key': encryption_key
             }
             if external_ip:
                 insert_data['external_ip'] = external_ip
@@ -82,4 +106,4 @@ def fetch_settings(agent_id):
         except Exception as e:  # Catch all exceptions during insert
             logging.error(f"An error occurred while inserting settings: {e}")
 
-    return DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
+    return DEFAULT_TIMEOUT, DEFAULT_CHECK_IN, encryption_key

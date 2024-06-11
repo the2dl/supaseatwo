@@ -2,3 +2,4 @@ bcrypt
 requests
 supabase
 openai
+postgrest

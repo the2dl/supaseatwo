@@ -32,8 +32,6 @@ current_sleep_interval = 5
 CHECK_IN_THRESHOLD = timedelta(minutes=10)
 DEFAULT_TIMEOUT = 600
 
-# Add a setting to toggle AI summary feature
-
 def select_hostname():
     while True:
         # Fetch current data from the database

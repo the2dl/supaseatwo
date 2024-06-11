@@ -3,6 +3,8 @@ import socket
 from .config import supabase
 from .retry_utils import with_retries
 
+logging.basicConfig(level=logging.WARNING)
+
 def reset_agent_status(agent_id):
     """Reset the agent's status to 'Checked-In' at startup."""
 
