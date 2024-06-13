@@ -62,7 +62,7 @@ def handle_download_command(command_text, username, agent_id, hostname):
 
 def get_public_url(bucket_name, file_path):
     """Constructs the public URL for a file in Supabase storage."""
-    return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/public/{bucket_name}/{file_path}"
+    return f"https://{SUPABASE_URL.split('//')[1]}/storage/v1/object/{bucket_name}/{file_path}"
 
 def update_download_status(command_text, status):
     """Update the status of a command in the downloads table."""
