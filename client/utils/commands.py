@@ -23,6 +23,7 @@ PURPLE = '\033[35m'
 LIGHT_GREY = '\033[38;5;250m'
 YELLOW = '\033[33m'
 RESET = '\033[0m'
+LIGHT_CYAN = '\033[96m'
 
 # Add a global setting to toggle AI summary
 AI_SUMMARY = True
@@ -43,6 +44,19 @@ def fetch_agent_info_by_hostname(hostname):
     except Exception as e:
         print(f"{RED}Error:{RESET} An error occurred while fetching agent info for hostname {hostname}: {e}")
         return None, None
+
+def get_local_user(hostname):
+    """Fetch the local user using the hostname from the settings table."""
+    try:
+        response = supabase.table('settings').select('localuser').eq('hostname', hostname).execute()
+        if response.data:
+            return response.data[0].get('localuser')
+        else:
+            print(f"{RED}Error:{RESET} No local user found for hostname: {hostname}")
+            return None
+    except Exception as e:
+        print(f"{RED}Error:{RESET} An error occurred while fetching local user for hostname {hostname}: {e}")
+        return None
 
 def decrypt_output(encrypted_output, key):
     try:
@@ -205,12 +219,16 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
 
     def get_prompt():
         if smb_hostname:
-            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
+            return f"{LIGHT_GREY}{username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
         else:
-            return f"{LIGHT_GREY}{username}{RESET} ({GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
+            return f"{LIGHT_GREY}{username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
 
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
     print(f"Commands are being issued by user: {username}")
+
+    local_user = get_local_user(hostname)
+    if not local_user:
+        local_user = 'unknown'
 
     external_ip = supabase.table("settings").select("external_ip").eq("hostname", hostname).execute().data
     external_ip = external_ip[0].get('external_ip', 'unknown') if external_ip else 'unknown'

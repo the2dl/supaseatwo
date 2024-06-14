@@ -1,5 +1,6 @@
 import logging
 import httpx
+import os
 from datetime import datetime
 from cryptography.fernet import Fernet
 from .system_info import get_system_info
@@ -37,6 +38,7 @@ def fetch_agent_id_by_hostname(hostname):
 def fetch_settings(agent_id):
     """Fetch the system settings from the settings table, or return default values."""
     hostname, ip, os_info = get_system_info()
+    local_user = os.getlogin()  # Fetch the current user's username
     response = with_retries(lambda: supabase.table('settings').select('*').eq('agent_id', agent_id).limit(1).execute())
     settings_data = response.data
 
@@ -73,13 +75,14 @@ def fetch_settings(agent_id):
         else:
             logging.debug(f"Fetched existing encryption key: {encryption_key}")
 
-        # Try updating the last checked-in time with error handling
+        # Update the last checked-in time and localuser with error handling
         try:
             with_retries(lambda: supabase.table('settings').update({
-                'last_checked_in': now
+                'last_checked_in': now,
+                'localuser': local_user
             }).eq('agent_id', agent_id).execute())
         except Exception as e:
-            logging.warning(f"Failed to update last checked-in time: {e}")
+            logging.warning(f"Failed to update last checked-in time and localuser: {e}")
 
         return timeout_interval, check_in_status, encryption_key
     else:
@@ -97,6 +100,7 @@ def fetch_settings(agent_id):
                 'check_in': DEFAULT_CHECK_IN,
                 'last_checked_in': now,
                 'username': '',  # Default empty string for username
+                'localuser': local_user,
                 'encryption_key': encryption_key
             }
             if external_ip:
