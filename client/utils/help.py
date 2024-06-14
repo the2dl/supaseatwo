@@ -15,10 +15,22 @@ detailed_help = {
         "example": "sleep 5"
     },
     "ps": {
-        "description": "Lists all processes or filters them by name or terminates a process by ID.",
+        "description": "Lists all processes.",
         "command": "ps",
-        "parameters": "<none> or grep <pattern> or term <processid>",
-        "example": "ps\nps grep notepad\nps term 1234"
+        "parameters": "<none>",
+        "example": "ps"
+    },
+    "ps grep": {
+        "description": "Lists all processes and filters them by name.",
+        "command": "ps",
+        "parameters": "grep <pattern>",
+        "example": "ps grep notepad"
+    },
+    "ps term": {
+        "description": "Terminates a process by ID.",
+        "command": "ps",
+        "parameters": "term <processid>",
+        "example": "ps term 1234"
     },
     "run": {
         "description": "Launches a process from a remote file.",
@@ -129,7 +141,7 @@ detailed_help = {
         "example": "nslookup example.com"
     },
     "compress": {
-        "description": "Compresses a file into <=50MB chunks, stored in C:\\ProgramData\\Microsoft\\chunk.",
+        "description": "Compresses a file into <=50MB chunks, stored in C:\\ProgramData\\chunk",
         "command": "compress",
         "parameters": "file_path",
         "example": "compress C:\\path\\to\\file.txt"
@@ -204,13 +216,13 @@ detailed_help = {
         "description": "Injects and executes shellcode in explorer.exe.",
         "command": "injectshellcode",
         "parameters": "file_path",
-        "example": "injectshellcode C:\\path\\to\\shellcode.bin"
+        "example": "injectshellcode C:\\remote\\shellcode.bin"
     },
     "inject_memory": {
         "description": "Uploads shellcode file and injects it into explorer.exe.",
         "command": "inject_memory",
         "parameters": "local_path",
-        "example": "inject_memory C:\\path\\to\\shellcode.bin"
+        "example": "inject_memory C:\\local\\shellcode.bin"
     },
     "list_scheduled_tasks": {
         "description": "Lists all scheduled tasks.",
@@ -247,6 +259,12 @@ detailed_help = {
         "command": "view_history",
         "parameters": "none or grep <term>",
         "example": "view_history\nview_history grep term"
+    },
+    "view_history grep": {
+        "description": "Parse the command history for the current host.",
+        "command": "view_history",
+        "parameters": "grep <term>",
+        "example": "view_history grep term"
     },
     "kill": {
         "description": "Terminates the agent.",
