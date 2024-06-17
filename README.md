@@ -131,6 +131,13 @@ The agent script provides utility functions for running commands, retrieving sys
 `C:\Users\dan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\Scripts\pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\pywin32_system32\\pywintypes310.dll;." --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\win32\\lib\\win32timezone.py;." supaseatwo.py
 ```
 
+## Pywine
+If you want to compile from Linux cross-platform, pywine with the required imports is available. Install docker first on your base OS, adjust the pyinstaller packaging options as required.
+
+```
+cd pywine && docker build -t supaseatwo . && docker run --rm -v "$(pwd)":/app supaseatwo sh -c "wine pyinstaller --name supaseatwo --onefile --windowed --add-data '/app/utils;utils' /app/supaseatwo.py && cp -r /dist /app/dist"
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
