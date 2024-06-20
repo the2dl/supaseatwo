@@ -35,8 +35,8 @@ DEFAULT_TIMEOUT = 600
 
 def select_hostname():
     while True:
-        # Fetch current data from the database
-        response = supabase.table('settings').select('hostname, last_checked_in, check_in, timeout_interval').execute()
+        # Fetch current data from the database, ordered by last_checked_in
+        response = supabase.table('settings').select('hostname, last_checked_in, check_in, timeout_interval').order('last_checked_in', desc=True).execute()
         hosts = response.data
         now = datetime.utcnow()
 
@@ -44,7 +44,7 @@ def select_hostname():
             print(f"\n{YELLOW}No hosts available, start an agent to utilize the client.{RESET}")
             return None
 
-        print("\nList of Hosts:")
+        print("\nList of Hosts (ordered by last check-in time):")
         for index, host in enumerate(hosts, start=1):
             hostname = host['hostname']
             last_checked_in_str = host.get('last_checked_in')
