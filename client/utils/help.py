@@ -44,6 +44,12 @@ detailed_help = {
         "parameters": "directory_path",
         "example": "ls C:\\Users\\"
     },
+        "wmirun": {
+        "description": "Executes a command on a remote machine via WMI.",
+        "command": "wmirun",
+        "parameters": "<hostname> <command> [user password domain]",
+        "example": "wmirun win-web C:\\ProgramData\\file.exe domainadmin password hacker.inc"
+    },
     "mv": {
         "description": "Moves a file or directory to a new location.",
         "command": "mv",
@@ -329,6 +335,7 @@ def display_help(command_mappings):
     print(" getsmb <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
     print(" writesmb <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
     print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
+    print(" wmirun <hostname> <command> [user password domain] :: Execute a command on a remote host via WMI")
     print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
     print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
     print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
