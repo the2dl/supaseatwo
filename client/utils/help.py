@@ -201,7 +201,7 @@ detailed_help = {
         "example": "writesmb C:\\local\\file.txt \\\\remote\\share\\file.txt user pass domain"
     },
     "winrmexec": {
-        "description": "Executes a command on a remote host via WinRM.",
+        "description": "Executes a command on a remote host via WinRM. This is not good for long-running processes.",
         "command": "winrmexec",
         "parameters": "remote_host command [username password domain]",
         "example": "winrmexec remote_host ipconfig user pass domain"
@@ -235,6 +235,12 @@ detailed_help = {
         "command": "list_scheduled_tasks",
         "parameters": "none",
         "example": "list_scheduled_tasks"
+    },
+    "rpcrun": {
+        "description": "Executes a command on a remote machine via RPC using pypsexec, starting the process in the background.",
+        "command": "rpcrun",
+        "parameters": "<hostname> <command> [user password]",
+        "example": "rpcrun win-web C:\\ProgramData\\smb5.exe domainadmin password"
     },
     "create_scheduled_task": {
         "description": "Creates a scheduled task.",
@@ -336,6 +342,7 @@ def display_help(command_mappings):
     print(" writesmb <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
     print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
     print(" wmirun <hostname> <command> [user password domain] :: Execute a command on a remote host via WMI")
+    print(" rpcrun <hostname> <command> [user pass] :: Execute a command on a remote host via RPC")
     print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
     print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
     print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
