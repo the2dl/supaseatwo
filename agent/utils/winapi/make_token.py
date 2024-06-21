@@ -1,20 +1,13 @@
-# utils/winapi/make_token.py
-
 import ctypes
 from ctypes.wintypes import HANDLE, DWORD, BOOL, LPWSTR
 
 # Constants
-LOGON32_LOGON_INTERACTIVE = 2
-LOGON32_PROVIDER_DEFAULT = 0
+LOGON32_LOGON_NEW_CREDENTIALS = 9
+LOGON32_PROVIDER_WINNT50 = 3
 
 # Load DLLs
 advapi32 = ctypes.WinDLL('advapi32', use_last_error=True)
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-
-# Define necessary structures
-class TOKEN_PRIVILEGES(ctypes.Structure):
-    _fields_ = [("PrivilegeCount", DWORD),
-                ("Privileges", ctypes.c_ulonglong * 3)]
 
 # Define necessary functions
 advapi32.LogonUserW.restype = BOOL
@@ -32,14 +25,18 @@ def make_token(username, password, domain=''):
     """Create a new security token and impersonate the user."""
     token = HANDLE()
 
-    if not advapi32.LogonUserW(username, domain, password, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, ctypes.byref(token)):
+    # Ensure strings are properly encoded for use in LogonUserW
+    username_buf = ctypes.create_unicode_buffer(username)
+    password_buf = ctypes.create_unicode_buffer(password)
+    domain_buf = ctypes.create_unicode_buffer(domain)
+
+    if not advapi32.LogonUserW(username_buf, domain_buf, password_buf, LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50, ctypes.byref(token)):
         raise ctypes.WinError(ctypes.get_last_error())
 
     if not advapi32.ImpersonateLoggedOnUser(token):
         kernel32.CloseHandle(token)
         raise ctypes.WinError(ctypes.get_last_error())
 
-    # Optionally return token for further use, or close handle if no longer needed
     return "Token created and user impersonation started."
 
 def revert_to_self():
