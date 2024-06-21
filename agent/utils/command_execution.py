@@ -676,7 +676,7 @@ def execute_commands(agent_id):
                 try:
                     parts = command_text.split(' ', 4)
                     if len(parts) < 3:
-                        raise ValueError("Invalid rpcrun command format. Use 'rpcrun <hostname> <command> [user password domain]'")
+                        raise ValueError("Invalid rpcrun command format. Use 'rpcrun <hostname> <command> [user password]'")
 
                     remote_hostname = parts[1]
                     command = parts[2]

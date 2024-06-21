@@ -525,10 +525,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 command_text = f"wmirun {remote_hostname} {command}"
 
         elif command_text.startswith("rpcrun"):
-            parts = command_text.split(maxsplit=4)
+            parts = command_text.split(maxsplit=5)
             if len(parts) < 3:
                 print(f"{RED}Error:{RESET} Invalid rpcrun command format. Use 'rpcrun <hostname> <command> [user password domain]'.")
                 continue
+
             remote_hostname = parts[1]
             command = parts[2]
             user = parts[3] if len(parts) > 3 else ''
@@ -538,7 +539,11 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if domain:
                 user = f"{domain}\\{user}"
             
-            command_text = f"rpcrun {remote_hostname} {command} {user} {password}"
+            # Only include user and password if they are provided
+            if user and password:
+                command_text = f"rpcrun {remote_hostname} {command} {user} {password}"
+            else:
+                command_text = f"rpcrun {remote_hostname} {command}"
 
         elif command_text.startswith("netexec"):
             parts = command_text.split(maxsplit=2)
