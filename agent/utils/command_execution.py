@@ -33,7 +33,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.cp import cp
     from utils.winapi.rm import rm
     from utils.winapi.wmirun import wmirun
-    from utils.winapi.rcprun import rpcrun
+    from utils.winapi.rpcrun import rpcrun
     from utils.winapi.inject_shellcode import load_shellcode_into_explorer
     from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
     from utils.winapi.cd import cd
