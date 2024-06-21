@@ -654,9 +654,9 @@ def execute_commands(agent_id):
             # Insert this snippet in the appropriate section of the execute_commands function
             elif os.name == 'nt' and command_text.lower().startswith('wmirun'):
                 try:
-                    parts = command_text.split(' ', 4)
-                    if len(parts) < 4:
-                        raise ValueError("Invalid wmirun command format. Use 'wmirun <hostname> <command> [user password domain]'")
+                    parts = command_text.split(' ', 5)
+                    if len(parts) < 3:
+                        raise ValueError("Invalid wmirun command format. Use 'wmirun <hostname> <command> [user] [password] [domain]'")
 
                     remote_hostname = parts[1]
                     command = parts[2]
