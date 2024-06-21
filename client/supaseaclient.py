@@ -11,6 +11,7 @@ from utils import login
 from utils.commands import send_command_and_get_output, view_command_history
 from utils.download import list_and_download_files
 from utils.database import supabase
+from utils.ai_email_template import generate_email_template, display_email_template
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -138,6 +139,14 @@ def generate_payload():
     except subprocess.CalledProcessError as e:
         print(f"{RED}Failed to generate payload: {e}{RESET}")
 
+def generate_email():
+    topic = input("Enter the topic: ")
+    recipient_name = input("Enter the recipient name: ")
+    url_to_file = input("Enter the URL to the file: ")
+    email_template = generate_email_template(topic, recipient_name, url_to_file)
+    if email_template:
+        display_email_template(email_template)
+
 def main():
 
     print("\n                                               _                       ")
@@ -155,7 +164,8 @@ def main():
         print(f"\nLogged in as '{username}'\n")
         print("1. Select Host")
         print("2. Generate Payload")
-        print("3. Exit")
+        print("3. Generate Email Template")
+        print("4. Exit")
 
         choice = input("\nEnter your choice: ")
         try:
@@ -194,6 +204,8 @@ def main():
             elif choice == 2:
                 generate_payload()
             elif choice == 3:
+                generate_email()
+            elif choice == 4:
                 print("Exiting...")
                 break
             else:

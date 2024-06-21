@@ -1,8 +1,9 @@
 import openai
 from cryptography.fernet import Fernet
+from utils.database import OPENAI_API_KEY
 
 def generate_summary(command, command_output, encryption_key=None):
-    client = openai.OpenAI(api_key="sk-proj-LQ5dm3iwTPD8Gkg3ys0ET3BlbkFJYrX98APv3iBjcHHRUNEU")
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
     try:
         response = client.chat.completions.create(
