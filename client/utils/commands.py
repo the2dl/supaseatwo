@@ -468,6 +468,15 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             group_type, group_name = parts[1], parts[2]
             command_text = f"users {group_type} {group_name}"
 
+        elif command_text.startswith("get_user_info"):
+            parts = command_text.split(' ', 2)
+            if len(parts) < 2:
+                print(f"{RED}Error:{RESET} Invalid get_user_info command format. Use 'get_user_info <username> [domain]'.")
+                continue
+            username = parts[1]
+            domain = parts[2] if len(parts) > 2 else None
+            command_text = f"get_user_info {username} {domain if domain else ''}"
+
         elif command_text.startswith("getsmb"):
             parts = command_text.split()
             if len(parts) < 3:

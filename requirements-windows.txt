@@ -6,3 +6,5 @@ pywin32
 pythonnet
 pywinrm
 postgrest
+pypsexec
+wim
