@@ -580,33 +580,33 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 print(f"{RED}Error:{RESET} {e}")
                 continue
 
-        elif command_text.startswith("link smb agent"):
+        elif command_text.startswith("link_smb_agent"):
             parts = command_text.split(maxsplit=6)
             if len(parts) < 4 or len(parts) > 7:
-                print(f"{RED}Error:{RESET} Invalid link smb agent command format. Use 'link smb agent <ip_address> [username password domain]'.")
+                print(f"{RED}Error:{RESET} Invalid link_smb_agent command format. Use 'link_smb_agent <ip_address> [username password domain]'.")
                 continue
             linked_smb_ip = parts[3]
             if len(parts) == 4:
-                command_text = f"link smb agent {linked_smb_ip}"
+                command_text = f"link_smb_agent {linked_smb_ip}"
             elif len(parts) == 5:
                 username = parts[4]
-                command_text = f"link smb agent {linked_smb_ip} {username}"
+                command_text = f"link_smb_agent {linked_smb_ip} {username}"
             elif len(parts) == 6:
                 username, password = parts[4], parts[5]
-                command_text = f"link smb agent {linked_smb_ip} {username} {password}"
+                command_text = f"link_smb_agent {linked_smb_ip} {username} {password}"
             elif len(parts) == 7:
                 username, password, domain = parts[4], parts[5], parts[6]
-                command_text = f"link smb agent {linked_smb_ip} {username} {password} {domain}"
+                command_text = f"link_smb_agent {linked_smb_ip} {username} {password} {domain}"
 
-        elif command_text.startswith("unlink smb agent"):
+        elif command_text.startswith("unlink_smb_agent"):
             parts = command_text.split(maxsplit=3)
             if len(parts) != 4:
-                print(f"{RED}Error:{RESET} Invalid unlink smb agent command format. Use 'unlink smb agent <ip_address>'.")
+                print(f"{RED}Error:{RESET} Invalid unlink_smb_agent command format. Use 'unlink_smb_agent <ip_address>'.")
                 continue
             if linked_smb_ip == parts[3]:
                 linked_smb_ip = None
                 smb_hostname = None
-            command_text = f"unlink smb agent {parts[3]}"
+            command_text = f"unlink_smb_agent {parts[3]}"
 
         elif command_text == "hostname":
             command_text = "hostname"
@@ -663,7 +663,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             else:
                 command_text = f'create_scheduled_task {task_name} "{trigger_time}"'
 
-        if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
+        if linked_smb_ip and not command_text.startswith("link_smb_agent") and not command_text.startswith("unlink_smb_agent"):
             command_text = f"smb {command_text}"
 
         command_text = command_mappings.get(command_text, command_text)

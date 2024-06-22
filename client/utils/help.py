@@ -194,6 +194,12 @@ detailed_help = {
         "parameters": "remote_file_path local_file_path [username password domain]",
         "example": "getsmb \\\\remote\\share\\file.txt C:\\local\\file.txt user pass domain"
     },
+    "get_user_info": {
+        "description": "Retrieves detailed information about a user.",
+        "command": "get_user_info",
+        "parameters": "<username> [domain]",
+        "example": "get_user_info johndoe example.com"
+    },
     "writesmb": {
         "description": "Writes a file to a remote host via SMB protocol.",
         "command": "writesmb",
@@ -206,17 +212,17 @@ detailed_help = {
         "parameters": "remote_host command [username password domain]",
         "example": "winrmexec remote_host ipconfig user pass domain"
     },
-    "link smb agent": {
+    "link_smb_agent": {
         "description": "Links the SMB agent to the current host using the specified IP address, optionally with credentials.",
-        "command": "link smb agent",
+        "command": "link_smb_agent",
         "parameters": "ip_address [username password domain]",
-        "example": "link smb agent 192.168.1.1 user pass domain"
+        "example": "link_smb_agent 192.168.1.1 user pass domain"
     },
-    "unlink smb agent": {
+    "unlink_smb_agent": {
         "description": "Unlinks the SMB agent from the current host using the specified IP address.",
-        "command": "unlink smb agent",
+        "command": "unlink_smb_agent",
         "parameters": "ip_address",
-        "example": "unlink smb agent 192.168.1.1"
+        "example": "unlink_smb_agent 192.168.1.1"
     },
     "injectshellcode": {
         "description": "Injects and executes shellcode in explorer.exe.",
@@ -334,17 +340,18 @@ def display_help(command_mappings):
     print(" compress <file_path>          :: Compress a file into <=50MB chunks, stored in C:\\ProgramData\\Microsoft\\chunk")
     print(" download <file_path>          :: Download a file from the asset")
     print(" upload <local_path> <remote_path> :: Upload a file to the asset")
+    print(" get_user_info <username> [domain] :: Retrieves detailed information about a user")
     print(" users <local|dom> <groupname> or <domain\\group_name> :: List users in the specified local or domain group")
-    print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user")
-    print(" revert_to_self                :: Revert to the original security context")
+    print(" make_token <username> <password> [domain] :: Create a new security token and impersonate the user at the network layer")
+    print(" revert_to_self                :: Revert to the original security context (from make_token)")
     print(" netexec <local_file> <arguments> :: Run a .NET assembly in-memory")
     print(" getsmb <remote_file_path> <local_file_path> [username password domain]  :: Get a file from a remote host via SMB protocol")
     print(" writesmb <local_file_path> <remote_smb_path> [username password domain] :: Write a file to a remote host via SMB protocol")
     print(" winrmexec <remote_host> <command> [username password domain] :: Execute a command on a remote host via WinRM")
     print(" wmirun <hostname> <command> [user password domain] :: Execute a command on a remote host via WMI")
     print(" rpcrun <hostname> <command> [user pass] :: Execute a command on a remote host via RPC")
-    print(" link smb agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
-    print(" unlink smb agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
+    print(" link_smb_agent <ip_address> [username password domain]  :: Link the SMB agent to the current host using the specified IP address, optionally with credentials")
+    print(" unlink_smb_agent <ip_address> :: Unlink the SMB agent from the current host using the specified IP address")
     print(" injectshellcode <file_path>   :: Inject and execute shellcode in explorer.exe")
     print(" inject_memory <local_path>    :: Upload shellcode file and inject it into explorer.exe")
     print(" list_scheduled_tasks          :: List all scheduled tasks")
