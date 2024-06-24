@@ -138,6 +138,29 @@ If you want to compile from Linux cross-platform, pywine with the required impor
 cd pywine && docker build -t supaseatwo . && docker run --rm -v "$(pwd)":/app supaseatwo sh -c "wine pyinstaller --name supaseatwo --onefile --windowed --add-data '/app/utils;utils' /app/supaseatwo.py && cp -r /dist /app/dist"
 ```
 
+## PyQT
+
+ cd into supaQT & run the below
+ 2511  python3 -m venv env\n
+ 2513  source env/bin/activate
+
+pip install -r requirements.txt
+
+6/23, left off here:
+
+Traceback (most recent call last):
+  File "/Users/dan/Documents/supaQT/gui_main.py", line 237, in <lambda>
+    command_input.returnPressed.connect(lambda: self.on_command_enter(tab_name, terminal, command_input))
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dan/Documents/supaQT/gui_main.py", line 377, in on_command_enter
+    self.execute_command(hostname, command, terminal)
+  File "/Users/dan/Documents/supaQT/gui_main.py", line 394, in execute_command
+    output, command_id = self.command_executor.execute_command(hostname, self.current_user, command, encryption_key)
+    ^^^^^^^^^^^^^^^^^^
+TypeError: cannot unpack non-iterable NoneType object
+
+Check Claude tomorrow
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
