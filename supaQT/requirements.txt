@@ -1,0 +1,7 @@
+PyQt5
+supabase
+cryptography
+openai
+bcrypt
+requests
+
