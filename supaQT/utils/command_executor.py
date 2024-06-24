@@ -16,7 +16,7 @@ class CommandExecutor(QObject):
         agent_id, _ = encryption_manager.fetch_agent_info_by_hostname(hostname)
         if not agent_id:
             self.command_output.emit(f"Error: Unable to find agent_id for hostname {hostname}.")
-            return
+            return None, None  # Return None, None instead of just returning
 
         encrypted_command = encryption_manager.encrypt(command, encryption_key)
 
@@ -24,7 +24,7 @@ class CommandExecutor(QObject):
 
         if not result.data:
             self.command_output.emit(f"Error: Failed to insert command for {hostname}")
-            return
+            return None, None  # Return None, None instead of just returning
 
         command_id = result.data[0]['id']
         self.command_output.emit(f"Command added with ID {command_id}. Waiting for execution...")

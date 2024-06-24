@@ -387,22 +387,11 @@ class MainWindow(QMainWindow):
             return
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        formatted_command = f"{timestamp} [{self.current_user}] ~ {command}\n"
+        formatted_command = f"{timestamp} [{self.current_user}] ~ {command}\n\n"
         self.add_terminal_output(formatted_command, terminal, color=QColor('#A0A0A0'))
         
-        # Execute the command and get the output and command_id
-        output, command_id = self.command_executor.execute_command(hostname, self.current_user, command, encryption_key)
-        
-        # Generate AI summary
-        summary = generate_summary(command, output, command_id, encryption_key)
-        
-        # Update the terminal with the output and summary
-        self.add_terminal_output(f"\n{output}\n", terminal)
-        self.add_terminal_output(f"\nAI Summary: {summary}\n", terminal)
-        self.add_terminal_output("Command execution finished.\n\n", terminal)
-        
-        # Update AI summary display
-        self.ai_summary_display.setPlainText(summary)
+        # Submit the command for execution
+        self.command_executor.execute_command(hostname, self.current_user, command, encryption_key)
 
     def on_command_completed(self, command, output, summary):
         current_index = self.terminal_tabs.currentIndex()
@@ -419,7 +408,6 @@ class MainWindow(QMainWindow):
                     self.add_terminal_output(f"\n{output}\n", terminal)
                     self.add_terminal_output("\n", terminal)
                     self.add_terminal_output("Command execution finished.\n", terminal)
-                    self.add_terminal_output(f"\nAI Summary: {summary}\n", terminal)
 
         # Update AI summary display
         self.ai_summary_display.setPlainText(summary)
