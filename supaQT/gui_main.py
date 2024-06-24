@@ -455,8 +455,31 @@ class MainWindow(QMainWindow):
             remote_path, ok = QInputDialog.getText(self, "Remote Path", "Enter the remote path:")
             if ok:
                 hostname = self.get_selected_hostname()
-                agent_id = self.host_manager.get_agent_id(hostname)
-                self.uploader.upload_file(agent_id, hostname, local_path, remote_path, self.current_user)
+                if hostname:
+                    agent_id, encryption_key = self.host_manager.get_agent_info(hostname)
+                    if agent_id:
+                        if isinstance(agent_id, list):
+                            agent_id = agent_id[0]
+                        
+                        current_terminal = self.get_current_terminal()
+                        
+                        # Disconnect previous connections
+                        self.uploader.upload_progress.disconnect()
+                        self.uploader.upload_complete.disconnect()
+                        self.uploader.upload_error.disconnect()
+                        
+                        # Reconnect signals
+                        self.uploader.upload_progress.connect(lambda msg: self.add_terminal_output(msg + "\n", current_terminal))
+                        self.uploader.upload_complete.connect(lambda filename, target_path: 
+                            self.add_terminal_output(f"Upload successful! File '{filename}' is now available at: {target_path}\n", current_terminal))
+                        self.uploader.upload_error.connect(lambda msg: self.add_terminal_output(msg + "\n", current_terminal))
+                        
+                        # Perform upload
+                        self.uploader.upload_file(agent_id, hostname, local_path, remote_path, self.current_user)
+                    else:
+                        self.add_terminal_output(f"Error: Unable to fetch agent info for {hostname}\n", self.get_current_terminal())
+                else:
+                    self.add_terminal_output("Error: No host selected\n", self.get_current_terminal())
 
     def update_upload_progress(self, progress):
         current_terminal = self.get_current_terminal()
@@ -464,7 +487,7 @@ class MainWindow(QMainWindow):
 
     def on_upload_complete(self, filename, remote_url):
         current_terminal = self.get_current_terminal()
-        self.add_terminal_output(f"Upload complete: {filename} is now available at {remote_url}", current_terminal)
+        self.add_terminal_output(f"Upload complete: {filename} is now available at {remote_url}\n", current_terminal)
 
     def on_upload_error(self, error):
         current_terminal = self.get_current_terminal()

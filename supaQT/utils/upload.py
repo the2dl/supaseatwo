@@ -1,49 +1,39 @@
 import os
 from PyQt5.QtCore import QObject, pyqtSignal
 from datetime import datetime
-from utils.database import db_manager, get_public_url
+from utils.database import db_manager, get_public_url, supabase
 
 class Uploader(QObject):
     upload_progress = pyqtSignal(str)
-    upload_complete = pyqtSignal(str, str)  # Emits filename and remote URL
+    upload_complete = pyqtSignal(str, str)  # We'll emit filename and target path
     upload_error = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
 
     def upload_file(self, agent_id, hostname, local_path, remote_path, username):
-        """Uploads a file to the specified host via Supabase storage."""
-
-        bucket_name = "files"  # Name of the storage bucket in Supabase
+        bucket_name = "files"
         try:
-            # Check if the local file exists
             if not os.path.exists(local_path):
-                self.upload_error.emit(f"Error: Local file '{local_path}' not found.")
-                return
+                raise FileNotFoundError(f"Local file '{local_path}' not found.")
 
             if os.path.isdir(local_path):
-                self.upload_error.emit(f"Error: Invalid path, it is a directory: {local_path}")
-                return
+                raise IsADirectoryError(f"Invalid path, it is a directory: {local_path}")
 
             filename = os.path.basename(local_path)
             storage_path = f"uploads/{filename}"
 
             self.upload_progress.emit(f"Uploading '{local_path}' as '{storage_path}' on '{hostname}'...")
 
-            # Open the file in binary mode and upload to Supabase
             with open(local_path, 'rb') as f:
-                response = db_manager.upload_file(bucket_name, storage_path, f)
+                response = supabase.storage.from_(bucket_name).upload(storage_path, f)
 
-                # Check if the upload was successful
                 if response.status_code not in [200, 201]:
                     raise Exception(f"Failed to upload: {response.json().get('message')}")
 
-            # Get the public URL for the uploaded file
             file_url = get_public_url(bucket_name, storage_path)
-            self.upload_progress.emit(f"Upload successful! File available at: {file_url}")
 
-            # Store upload information in the database
-            db_manager.insert_upload({
+            supabase.table("uploads").insert({
                 'agent_id': agent_id,
                 'hostname': hostname,
                 'local_path': local_path,
@@ -51,19 +41,18 @@ class Uploader(QObject):
                 'file_url': file_url,
                 'username': username,
                 'timestamp': datetime.utcnow().isoformat(),
-                'status': 'Completed'
-            })
+                'status': 'pending'
+            }).execute()
 
-            self.upload_complete.emit(filename, file_url)
-            return "Completed", f"File uploaded to {file_url}"
+            self.upload_complete.emit(filename, remote_path)
+            return "Completed", f"File uploaded successfully"
 
         except Exception as e:
-            error_message = f"Upload failed: {e}"
+            error_message = f"Upload failed: {str(e)}"
             self.upload_error.emit(error_message)
             return "Failed", error_message
 
 uploader = Uploader()
 
 def upload_file(agent_id, hostname, local_path, remote_path, username):
-    """Function to be called from other parts of the application."""
     return uploader.upload_file(agent_id, hostname, local_path, remote_path, username)

@@ -77,9 +77,13 @@ class HostManager(QObject):
         return 'unknown'
 
     def get_agent_info(self, hostname):
-        response = db_manager.get_host_settings(hostname)
-        if response:
-            return response.get('agent_id'), response.get('encryption_key')
+        settings = db_manager.get_host_settings(hostname)
+        if settings:
+            agent_id = settings.get('agent_id')
+            encryption_key = settings.get('encryption_key')
+            if encryption_key:
+                encryption_key = encryption_key.encode()
+            return agent_id, encryption_key
         return None, None
 
     def update_sleep_interval(self, hostname, interval):
