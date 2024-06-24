@@ -407,7 +407,6 @@ class MainWindow(QMainWindow):
                     self.add_terminal_output("\n", terminal)
                     self.add_terminal_output(f"\n{output}\n", terminal)
                     self.add_terminal_output("\n", terminal)
-                    self.add_terminal_output("Command execution finished.\n", terminal)
 
         # Update AI summary display
         self.ai_summary_display.setPlainText(summary)
