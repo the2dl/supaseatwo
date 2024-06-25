@@ -252,7 +252,7 @@ detailed_help = {
         "description": "Creates a scheduled task.",
         "command": "create_scheduled_task",
         "parameters": "task_name command_line trigger_time [repeat_interval] [repeat_duration]",
-        "example": "create_scheduled_task MyTask 'C:\\path\\to\\app.exe' '2024-06-01T12:00:00' 'PT1H' 'P1D'"
+        "example": "create_scheduled_task MyTask "'C:\\path\\to\\app.exe'" 2024-06-28T12:00:00 1H 1D"
     },
     "delete_scheduled_task": {
         "description": "Deletes a scheduled task.",

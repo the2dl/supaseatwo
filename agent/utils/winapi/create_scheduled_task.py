@@ -74,7 +74,7 @@ def create_scheduled_task(task_name, command_line, trigger_time, repeat_interval
             6,  # TASK_CREATE_OR_UPDATE
             None,  # No user
             None,  # No password
-            2  # TASK_LOGON_SERVICE_ACCOUNT
+            3  # CURRENT USER CONTEXT
         )
 
         return [f"Scheduled task '{task_name}' created successfully."]

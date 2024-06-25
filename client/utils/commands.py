@@ -232,10 +232,10 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
     tokenized_username = None  # Track the tokenized username
 
     def get_prompt():
+        token_part = f"::{tokenized_username}" if tokenized_username else ""
         if smb_hostname:
-            return f"{LIGHT_GREY}{logged_in_username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
+            return f"{LIGHT_GREY}{logged_in_username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{RED}{tokenized_username}@{smb_hostname}{RESET} {RED}smb{RESET}) ~ "
         else:
-            token_part = f"::{tokenized_username}" if tokenized_username else ""
             return f"{LIGHT_GREY}{logged_in_username}{RESET} ({LIGHT_CYAN}{local_user}{RESET}@{GREEN}{hostname}{RESET}::{BLUE}{external_ip}{RESET}{RED}{token_part}{RESET}) ~ "
 
     print(f"\nYou are now interacting with '{GREEN}{hostname}{RESET}'. Type 'exit' or 'help' for options.")
