@@ -148,7 +148,6 @@ def generate_email():
         display_email_template(email_template)
 
 def main():
-
     print("\n                                               _                       ")
     print("     o o o ____  _ _ __  __ _   ___ ___ __ _  | |___ __ _____ o o o    ")
     print("  o o o o (_-< || | '_ \/ _` | (_-</ -_) _` | |  _\ V  V / _ \ o o o o ")
