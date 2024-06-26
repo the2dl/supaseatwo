@@ -1,4 +1,5 @@
 import sys
+import logging
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QSplitter, QListWidget, QTextEdit, QLineEdit, QPushButton, 
                              QLabel, QTabWidget, QFileDialog, QInputDialog, QMessageBox, 
@@ -19,6 +20,9 @@ from utils.ai_email_template import email_generator
 from utils.ai_summary import ai_summarizer, generate_summary
 from utils.help import help_manager
 from login_window import LoginWindow
+from utils.ai_report import SummaryTab
+
+logging.basicConfig(level=logging.ERROR)
 
 class AISummaryThread(QThread):
     summary_ready = pyqtSignal(str)
@@ -121,6 +125,11 @@ class MainWindow(QMainWindow):
         self.help_display = QTextEdit()
         self.help_display.setReadOnly(True)
         help_layout.addWidget(self.help_display)
+
+        # Create Summary tab
+        summary_tab = SummaryTab()
+        self.tab_widget.addTab(summary_tab, "Summary")
+        logging.debug("Summary tab added to main window")
 
         # Set initial sizes
         main_splitter.setSizes([400, 400])
