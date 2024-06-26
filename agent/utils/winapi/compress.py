@@ -1,67 +1,95 @@
 import os
 import lzma
-import shutil
+import uuid
+import threading
+from ..file_operations import supabase, bucket_name, with_retries, get_public_url
 
 CHUNK_SIZE = 50 * 1024 * 1024  # 50MB
-CHUNK_OUTPUT_DIR = r"C:\ProgramData\chunk"
-FINAL_OUTPUT_DIR = r"C:\ProgramData"
 
-def ensure_output_directory():
-    if not os.path.exists(CHUNK_OUTPUT_DIR):
-        os.makedirs(CHUNK_OUTPUT_DIR)
+def compress_and_upload_file(file_path, command_id):
+    base_name = os.path.basename(file_path)
+    chunk_number = 0
+    chunk_urls = []
+    file_id = str(uuid.uuid4())  # Generate a unique ID for this file
 
-def chunk_file(file_path, chunk_size=CHUNK_SIZE):
-    """Chunks a file into smaller pieces."""
-    chunks = []
-    with open(file_path, 'rb') as f:
-        chunk_number = 0
+    # Create an initial entry in the database
+    with_retries(lambda: supabase.table("file_chunks").insert({
+        "file_id": file_id,
+        "file_name": base_name,
+        "chunk_urls": [],
+        "total_chunks": 0,
+        "status": "in_progress"
+    }).execute())
+
+    with open(file_path, 'rb') as input_file:
+        lzc = lzma.LZMACompressor()
+        file_size = os.path.getsize(file_path)
+        bytes_processed = 0
+        
         while True:
-            chunk_data = f.read(chunk_size)
+            chunk_data = input_file.read(CHUNK_SIZE)
             if not chunk_data:
                 break
-            chunk_filename = os.path.join(CHUNK_OUTPUT_DIR, f"{os.path.basename(file_path)}.chunk{chunk_number}")
-            with open(chunk_filename, 'wb') as chunk_file:
-                chunk_file.write(chunk_data)
-            chunks.append(chunk_filename)
+            
+            compressed_chunk = lzc.compress(chunk_data)
+            if compressed_chunk:
+                chunk_name = f"chunks/{file_id}/{base_name}_chunk{chunk_number}.xz"
+                
+                # Upload the compressed chunk to Supabase
+                response = with_retries(lambda: supabase.storage.from_(bucket_name).upload(
+                    chunk_name, compressed_chunk, file_options={"content_type": "application/x-xz"}
+                ))
+                
+                if response.status_code in [200, 201]:
+                    chunk_url = get_public_url(bucket_name, chunk_name)
+                    chunk_urls.append(chunk_url)
+                    chunk_number += 1
+                    # Update the database entry after each successful chunk upload
+                    with_retries(lambda: supabase.table("file_chunks").update({
+                        "chunk_urls": chunk_urls,
+                        "total_chunks": chunk_number
+                    }).eq("file_id", file_id).execute())
+                else:
+                    raise Exception(f"Failed to upload chunk {chunk_number}")
+
+            bytes_processed += len(chunk_data)
+
+    # Upload the final chunk (if any)
+    final_chunk = lzc.flush()
+    if final_chunk:
+        chunk_name = f"chunks/{file_id}/{base_name}_chunk{chunk_number}.xz"
+        response = with_retries(lambda: supabase.storage.from_(bucket_name).upload(
+            chunk_name, final_chunk, file_options={"content_type": "application/x-xz"}
+        ))
+        
+        if response.status_code in [200, 201]:
+            chunk_url = get_public_url(bucket_name, chunk_name)
+            chunk_urls.append(chunk_url)
             chunk_number += 1
-    return chunks
+            # Update the database with the final chunk
+            with_retries(lambda: supabase.table("file_chunks").update({
+                "chunk_urls": chunk_urls,
+                "total_chunks": chunk_number,
+                "status": "completed"
+            }).eq("file_id", file_id).execute())
+        else:
+            raise Exception(f"Failed to upload final chunk")
 
-def merge_chunks(chunks, output_file):
-    """Merges chunk files into a single file."""
-    with open(output_file, 'wb') as merged_file:
-        for chunk in chunks:
-            with open(chunk, 'rb') as chunk_file:
-                shutil.copyfileobj(chunk_file, merged_file)
+    return chunk_urls
 
-def compress_file(file_path):
-    ensure_output_directory()
-    
-    compressed_file_path = os.path.join(CHUNK_OUTPUT_DIR, f"{os.path.basename(file_path)}.xz")
-    
-    # Compress the file
-    with open(file_path, 'rb') as input_file:
-        with lzma.open(compressed_file_path, 'wb') as compressed_file:
-            shutil.copyfileobj(input_file, compressed_file)
-    
-    # Chunk the compressed file
-    chunks = chunk_file(compressed_file_path)
-    
-    # If only one chunk, the file is already fully compressed
-    if len(chunks) == 1:
-        final_compressed_file_path = os.path.join(FINAL_OUTPUT_DIR, os.path.basename(compressed_file_path))
-        shutil.move(compressed_file_path, final_compressed_file_path)
-        if os.path.exists(final_compressed_file_path):
-            shutil.rmtree(CHUNK_OUTPUT_DIR)
-        return final_compressed_file_path
-    
-    # Merge chunks if they exist
-    final_compressed_file_path = os.path.join(FINAL_OUTPUT_DIR, f"{os.path.basename(file_path)}_final.xz")
-    merge_chunks(chunks, final_compressed_file_path)
-    
-    # Remove chunk files if the merge is successful
-    if os.path.exists(final_compressed_file_path):
-        for chunk in chunks:
-            os.remove(chunk)
-        shutil.rmtree(CHUNK_OUTPUT_DIR)
-    
-    return final_compressed_file_path
+def start_compression_thread(file_path, command_id, update_func, agent_id, ip, os_info, username, encryption_key):
+    def run_compression():
+        try:
+            chunk_urls = compress_and_upload_file(file_path, command_id)
+            output = f"File {os.path.basename(file_path)} compressed and uploaded successfully in {len(chunk_urls)} chunks"
+            status = 'Completed'
+        except Exception as e:
+            output = str(e)
+            status = 'Failed'
+        
+        # Use the passed function to update the command status
+        update_func(command_id, status, output, agent_id, ip, os_info, username, encryption_key)
+
+    thread = threading.Thread(target=run_compression)
+    thread.start()
+    return thread

@@ -12,6 +12,7 @@ from utils.commands import send_command_and_get_output, view_command_history
 from utils.download import list_and_download_files
 from utils.database import supabase
 from utils.ai_email_template import generate_email_template, display_email_template
+from utils.recompile import recompile_compressed_files
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -176,9 +177,10 @@ def main():
                 while hostname:
                     print(f"\nInteracting with '{GREEN}{hostname}{RESET}' with user '{username}'\n")
                     print("1. Interact")
-                    print("2. Exit to Host Selection")
-                    print("3. List Downloads")
-                    print("4. Exit to Local Terminal")
+                    print("2. List Downloads")
+                    print("3. Recompile Compressed Files")
+                    print("4. Exit to Host Selection")
+                    print("5. Exit to Local Terminal")
 
                     host_choice = input("\nEnter your choice: ")
                     try:
@@ -186,10 +188,12 @@ def main():
                         if host_choice == 1:
                             send_command_and_get_output(hostname, username, command_mappings, current_sleep_interval)
                         elif host_choice == 2:
-                            hostname = select_hostname()
-                        elif host_choice == 3:
                             list_and_download_files(hostname)
+                        elif host_choice == 3:
+                            recompile_compressed_files()
                         elif host_choice == 4:
+                            hostname = select_hostname()
+                        elif host_choice == 5:
                             break
                         else:
                             print("Invalid choice. Please try again.")
