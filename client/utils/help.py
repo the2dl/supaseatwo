@@ -153,7 +153,7 @@ detailed_help = {
         "example": "nslookup example.com"
     },
     "compress": {
-        "description": "Compresses a file into 50MB chunks and uploads them to Supabase storage. The process runs in the background.",
+        "description": "Compresses a file into 10MB-50MB chunks and uploads them to Supabase storage. The process runs in the background.",
         "command": "compress",
         "parameters": "file_path",
         "example": "compress C:\\path\\to\\file.txt",
@@ -344,7 +344,7 @@ def display_help(command_mappings):
     print(" hostname                      :: Retrieve the local hostname")
     print(" ipinfo                        :: Retrieve local interface details")
     print(" nslookup <hostname>           :: Perform a DNS lookup for the given hostname")
-    print(" compress <file_path>          :: Compress a file into 50MB chunks, and upload them to Supabase")
+    print(" compress <file_path>          :: Compress a file into 10MB-50MB chunks, and upload them to Supabase")
     print(" download <file_path>          :: Download a file from the asset")
     print(" upload <local_path> <remote_path> :: Upload a file to the asset")
     print(" get_user_info <username> [domain] :: Retrieves detailed information about a user")
