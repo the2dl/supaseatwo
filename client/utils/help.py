@@ -140,6 +140,12 @@ detailed_help = {
         "parameters": "none",
         "example": "ipinfo"
     },
+    "search": {
+        "description": "Searches local user directories, ProgramData, and other interesting areas for files with sensitive information (e.g., password files, AWS/GCP/Azure credentials).",
+        "command": "search",
+        "parameters": "none",
+        "example": "search"
+    },
     "nslookup": {
         "description": "Performs a DNS lookup for the given hostname.",
         "command": "nslookup",
@@ -327,6 +333,7 @@ def display_help(command_mappings):
     print(" mkdir <directory_path>        :: Create a new directory")
     print(" cd <directory_path>           :: Change current directory")
     print(" rm <path>                     :: Remove a file or directory")
+    print(" search                        :: Search for sensitive files (e.g., passwords, AWS/GCP/Azure credentials)")
     print(" get_ad_domain                 :: Retrieve the Active Directory domain name")
     print(" get_dc_list                   :: Retrieve the list of domain controllers")
     print(" get_logged_on_users           :: Retrieve the list of users currently logged on")
