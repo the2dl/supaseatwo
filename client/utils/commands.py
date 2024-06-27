@@ -614,6 +614,9 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
         elif command_text == "hostname":
             command_text = "hostname"
 
+        elif command_text.startswith("search"):
+            command_text = "search"
+
         elif command_text == "get_ad_domain":
             command_text = "get_ad_domain"
 

