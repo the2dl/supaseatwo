@@ -14,6 +14,8 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
 
 ## Installation
 
+Full installation docs can be found in [install](docs/install.md).
+
 1. Clone the repository:
     ```sh
     git clone https://github.com/the2dl/supaseatwo.git
