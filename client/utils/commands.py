@@ -3,15 +3,15 @@ import itertools
 import os
 import threading
 import shlex
-import base64
+from cryptography.fernet import Fernet
 import logging
 
 from .database import supabase, get_public_url
 from .download import download_file
 from .upload import upload_file
-from .ai_summary import generate_summary
-from .encryption_utils import fetch_agent_info_by_hostname, encrypt_message, decrypt_message
-from .help import display_detailed_help, display_help, detailed_help
+from .ai_summary import generate_summary  # Import the new AI summary module
+from .encryption_utils import fetch_agent_info_by_hostname, encrypt_response, decrypt_output
+from .help import display_detailed_help, display_help, detailed_help  # Import help functions and detailed_help from help.py
 
 # Spinner for visual feedback
 spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -28,8 +28,6 @@ LIGHT_CYAN = '\033[96m'
 
 # Add a global setting to toggle AI summary
 AI_SUMMARY = True
-
-#logging.basicConfig(level=logging.WARNING)
 
 # Function to display detailed help for a specific command
 def display_detailed_help(command):
@@ -50,11 +48,8 @@ def fetch_agent_info_by_hostname(hostname):
         if response.data:
             agent_info = response.data[0]
             encryption_key = agent_info.get('encryption_key')
-            if encryption_key:
-                # Decode the base64 string
-                encryption_key = base64.b64decode(encryption_key)
-                # Use only the first 32 bytes of the key
-                encryption_key = encryption_key[:32]
+            if (encryption_key):
+                encryption_key = encryption_key.encode()
             return agent_info['agent_id'], encryption_key
         else:
             print(f"{RED}Error:{RESET} No agent_id found for hostname: {hostname}")
@@ -75,6 +70,28 @@ def get_local_user(hostname):
     except Exception as e:
         print(f"{RED}Error:{RESET} An error occurred while fetching local user for hostname {hostname}: {e}")
         return None
+
+def decrypt_output(encrypted_output, key):
+    try:
+        logging.info(f"Decrypting output using key: {key}")
+        cipher_suite = Fernet(key)
+        decrypted_data = cipher_suite.decrypt(encrypted_output.encode()).decode()
+        logging.info(f"Decrypted output: {decrypted_data}")
+        return decrypted_data
+    except Exception as e:
+        logging.error(f"Failed to decrypt output: {e}")
+        return f"Failed to decrypt output: {e}"
+
+def encrypt_response(response, key):
+    try:
+        logging.info(f"Encrypting response using key: {key}")
+        cipher_suite = Fernet(key)
+        encrypted_data = cipher_suite.encrypt(response.encode()).decode()
+        logging.info(f"Encrypted response: {encrypted_data}")
+        return encrypted_data
+    except Exception as e:
+        logging.error(f"Failed to encrypt response: {e}")
+        return f"Failed to encrypt response: {e}"
 
 def view_command_history(hostname, search_term=None):
     """Fetch and display the command history for a specific host and its SMB agents, optionally filtering by a search term."""
@@ -103,10 +120,10 @@ def view_command_history(hostname, search_term=None):
         for command in commands:
             if encryption_key:
                 try:
-                    command['output'] = decrypt_message(command['output'], encryption_key)
-                    command['command'] = decrypt_message(command['command'], encryption_key)
+                    command['output'] = decrypt_output(command['output'], encryption_key)
+                    command['command'] = decrypt_output(command['command'], encryption_key)
                     if command['ai_summary']:
-                        command['ai_summary'] = decrypt_message(command['ai_summary'], encryption_key)
+                        command['ai_summary'] = decrypt_output(command['ai_summary'], encryption_key)
                 except Exception as e:
                     print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
 
@@ -179,7 +196,7 @@ def check_for_completed_commands(command_id, agent_id, encryption_key, printed_f
             # Decrypt the output if encryption key is available
             if encryption_key:
                 try:
-                    output = decrypt_message(output, encryption_key)
+                    output = decrypt_output(output, encryption_key)
                 except Exception as e:
                     print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
                     output = "Failed to decrypt output."
@@ -194,7 +211,7 @@ def check_for_completed_commands(command_id, agent_id, encryption_key, printed_f
             if AI_SUMMARY:
                 ai_summary = generate_summary(cmd, output)
                 if ai_summary:
-                    encrypted_summary = encrypt_message(ai_summary, encryption_key)
+                    encrypted_summary = encrypt_response(ai_summary, encryption_key)
                     print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
                     supabase.table('py2').update({'ai_summary': encrypted_summary}).eq('id', command_id).execute()
 
@@ -694,12 +711,12 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
                 print(f"{RED}Error:{RESET} Invalid upload command format. Use 'upload <local_path> <remote_path>'.")
                 continue
 
-        encrypted_command_text = encrypt_message(command_text, encryption_key)
+        encrypted_command_text = encrypt_response(command_text, encryption_key)
 
         result = supabase.table('py2').insert({
             'agent_id': agent_id,
-            'hostname': hostname,
-            'username': logged_in_username,
+            'hostname': hostname,  # Include hostname in the command record
+            'username': logged_in_username,  # Ensure the username is passed correctly
             'command': encrypted_command_text,
             'status': 'Pending'
         }).execute()
@@ -747,8 +764,8 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
                     # Decrypt the output if encryption key is available
                     if encryption_key:
                         try:
-                            output = decrypt_message(output, encryption_key)
-                            cmd = decrypt_message(cmd, encryption_key)
+                            output = decrypt_output(output, encryption_key)
+                            cmd = decrypt_output(cmd, encryption_key)
                         except Exception as e:
                             print(f"{RED}Error:{RESET} Failed to decrypt output: {e}")
                             output = "Failed to decrypt output."
@@ -763,7 +780,7 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
                     if AI_SUMMARY:
                         ai_summary = generate_summary(cmd, output)
                         if ai_summary:
-                            encrypted_summary = encrypt_message(ai_summary, encryption_key)
+                            encrypted_summary = encrypt_response(ai_summary, encryption_key)
                             print(f"\n{BLUE}AI Summary:{RESET} {ai_summary}\n")
                             supabase.table('py2').update({'ai_summary': encrypted_summary}).eq('id', command_id).execute()
 

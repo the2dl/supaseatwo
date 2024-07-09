@@ -2,9 +2,7 @@ import logging
 import httpx
 import os
 from datetime import datetime
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-import base64
+from cryptography.fernet import Fernet
 from .system_info import get_system_info
 from .config import supabase, DEFAULT_TIMEOUT, DEFAULT_CHECK_IN
 from .retry_utils import with_retries
@@ -37,23 +35,6 @@ def fetch_agent_id_by_hostname(hostname):
         return data[0]['agent_id']
     return None
 
-def generate_key():
-    return get_random_bytes(32)  # 256 bits
-
-def encrypt_message(message, key):
-    cipher = AES.new(key, AES.MODE_GCM)
-    ciphertext, tag = cipher.encrypt_and_digest(message.encode('utf-8'))
-    return base64.b64encode(cipher.nonce + tag + ciphertext).decode('utf-8')
-
-def decrypt_message(encrypted_message, key):
-    encrypted = base64.b64decode(encrypted_message.encode('utf-8'))
-    nonce = encrypted[:16]
-    tag = encrypted[16:32]
-    ciphertext = encrypted[32:]
-    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-    plaintext = cipher.decrypt_and_verify(ciphertext, tag)
-    return plaintext.decode('utf-8')
-
 def fetch_settings(agent_id):
     """Fetch the system settings from the settings table, or return default values."""
     hostname, ip, os_info = get_system_info()
@@ -83,7 +64,7 @@ def fetch_settings(agent_id):
 
         # Generate and store encryption key if not already stored
         if not encryption_key:
-            encryption_key = base64.b64encode(generate_key()).decode('utf-8')
+            encryption_key = Fernet.generate_key().decode()
             logging.debug(f"Generated encryption key: {encryption_key}")
             try:
                 with_retries(lambda: supabase.table('settings').update({
@@ -108,7 +89,7 @@ def fetch_settings(agent_id):
         # Insert new system info if no record exists for this agent_id
         try:
             external_ip = get_external_ip()
-            encryption_key = base64.b64encode(generate_key()).decode('utf-8')
+            encryption_key = Fernet.generate_key().decode()
             logging.debug(f"Generated encryption key for new agent: {encryption_key}")
             insert_data = {
                 'agent_id': agent_id,

@@ -1,5 +1,5 @@
 import openai
-from .encryption_utils import encrypt_message
+from cryptography.fernet import Fernet
 from utils.database import OPENAI_API_KEY
 
 def generate_summary(command, command_output, encryption_key=None):
@@ -16,7 +16,8 @@ def generate_summary(command, command_output, encryption_key=None):
         summary = response.choices[0].message.content.strip()
 
         if encryption_key:
-            encrypted_summary = encrypt_message(summary, encryption_key)
+            cipher_suite = Fernet(encryption_key)
+            encrypted_summary = cipher_suite.encrypt(summary.encode()).decode()
             return encrypted_summary
 
         return summary
