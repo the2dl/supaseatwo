@@ -16,7 +16,7 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/supaseatwo.git
+    git clone https://github.com/the2dl/supaseatwo.git
     cd supaseatwo
     ```
 
@@ -39,83 +39,23 @@ SupaSeaTwo is a Python application that facilitates interactions between a clien
    - Set up your Supabase project and obtain the URL and API key from settings.
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase credentials.
 
-2. **Supabase Tables:**
-   - **Users Table:**
-     ```sql
-      CREATE SEQUENCE users_id_seq;
-  
-      CREATE TABLE users (
-        id int4 PRIMARY KEY DEFAULT nextval('users_id_seq'),
-        username varchar,
-        password_hash varchar,
-        last_loggedin timestamptz
-      );
-     ```
+2. **Supabase DB Setup:**
 
-   - **Uploads Table:**
-     ```sql
-      CREATE TABLE uploads (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        hostname varchar,
-        local_path text,
-        remote_path text,
-        file_url text,
-        timestamp timestamptz DEFAULT now(),
-        status varchar DEFAULT 'pending'::character varying,
-        username text
-      );
-     ```
+You can utilize the [supa.sql](supa.sql) file in this project to create your tables, pk's, and links.
 
-  - **Settings Table:**
-     ```sql
-      CREATE TABLE settings (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        hostname text,
-        ip text,
-        external_ip text,
-        os text,
-        timeout_interval int4 DEFAULT 30,
-        check_in text DEFAULT 'Checked-in'::text,
-        last_checked_in timestamp,
-        username text
-      );
-     ```
+Get your hostname, user, db and password from Project Settings > Database. Generate a new one if needed.
 
-  - **Downloads Table:**
-     ```sql
-      CREATE SEQUENCE downloads_id_seq;
+Sample:
 
-      CREATE TABLE downloads (
-        id int8 PRIMARY KEY DEFAULT nextval('downloads_id_seq'),
-        hostname varchar,
-        local_path text,
-        remote_path text,
-        file_url text,
-        timestamp timestamptz DEFAULT now(),
-        status varchar DEFAULT 'pending'::character varying,
-        username text
-      );
-     ```
-
-  - **Py2 Table:**
-     ```sql
-      CREATE TABLE py2 (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        created_at timestamptz DEFAULT now(),
-        command text,
-        status text DEFAULT 'Pending'::text,
-        output text,
-        hostname text,
-        ip text,
-        os text,
-        smbhost text,
-        ai_summary text,
-        timeout_interval int8 DEFAULT 30,
-        username text
-      );
-     ```
+`psql -h aws-0-us-east-1.yoursupabase.com -p 6543 -U postgres.projname postgres < supa.sql`
 
 ## Usage
+
+### Python
+
+You can run this via Python on the command line without compiling, compiling just gives you a binary to move around easier.
+
+This has been tested with Python3.10 and Python3.11. Python3.12+ doesn't have support for pythonnet/etc as of 7/9/24.
 
 ### Client
 
@@ -125,11 +65,15 @@ The client script handles user authentication, file uploads, and command executi
 
 The agent script provides utility functions for running commands, retrieving system information, and updating agent status.
 
-## Compile Agent (fix later)
+## Compile Agent
 
 ```
-`C:\Users\dan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\Scripts\pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\pywin32_system32\\pywintypes310.dll;." --add-data "C:\\Users\\dan\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\win32\\lib\\win32timezone.py;." supaseatwo.py
+pyinstaller --name supaseatwo --onefile --windowed --icon=seatwo.ico --add-data "utils;utils" supaseatwo.py
 ```
+
+You may need to include a couple of dependencies, if so do this:
+
+--add-data "\path\to\pywintypes310.dll;." --add-data "\path\to\win32timezone.py;."
 
 ## Pywine
 If you want to compile from Linux cross-platform, pywine with the required imports is available. Install docker first on your base OS, adjust the pyinstaller packaging options as required.
@@ -138,6 +82,8 @@ If you want to compile from Linux cross-platform, pywine with the required impor
 cd pywine && docker build -t supaseatwo . && docker run --rm -v "$(pwd)":/app supaseatwo sh -c "wine pyinstaller --name supaseatwo --onefile --windowed --add-data '/app/utils;utils' /app/supaseatwo.py && cp -r /dist /app/dist"
 ```
 
+This has gotten flagged by Defender AV every time. Compiling from a Windows device doesn't.
+
 ## PyQT
 
  cd into supaQT & run the below
@@ -145,21 +91,6 @@ cd pywine && docker build -t supaseatwo . && docker run --rm -v "$(pwd)":/app su
  2513  source env/bin/activate
 
 pip install -r requirements.txt
-
-6/23, left off here:
-
-Traceback (most recent call last):
-  File "/Users/dan/Documents/supaQT/gui_main.py", line 237, in <lambda>
-    command_input.returnPressed.connect(lambda: self.on_command_enter(tab_name, terminal, command_input))
-                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/dan/Documents/supaQT/gui_main.py", line 377, in on_command_enter
-    self.execute_command(hostname, command, terminal)
-  File "/Users/dan/Documents/supaQT/gui_main.py", line 394, in execute_command
-    output, command_id = self.command_executor.execute_command(hostname, self.current_user, command, encryption_key)
-    ^^^^^^^^^^^^^^^^^^
-TypeError: cannot unpack non-iterable NoneType object
-
-Check Claude tomorrow
 
 ## Contributing
 
