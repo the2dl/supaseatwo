@@ -64,9 +64,9 @@ if [ "$auth_answer" != "yes" ]; then
     supabase login
 fi
 
-# Grab latest supaseatwo
-log "Cloning supaseatwo repository..."
-git clone https://github.com/the2dl/supaseatwo.git
+# Grab latest supaseatwo; user already has the repo.
+#log "Cloning supaseatwo repository..."
+#git clone https://github.com/the2dl/supaseatwo.git
 
 # Organization Creation
 log "Enter your organization name:"
@@ -128,7 +128,7 @@ log "Constructed dashboard URL: $project_url"
 # Database Setup (Corrected to use project id and include password)
 export PGPASSWORD="$password"
 log "Running: psql -h aws-0-us-east-1.pooler.supabase.com -p 6543 -d postgres -U postgres.$project_id"
-psql_output=$(psql -h aws-0-us-east-1.pooler.supabase.com -p 6543 -d postgres -U "postgres.$project_id" -f "$(pwd)/supaseatwo/supa.sql")
+psql_output=$(psql -h aws-0-us-east-1.pooler.supabase.com -p 6543 -d postgres -U "postgres.$project_id" -f "$(pwd)/supa.sql")
 log "psql output: $psql_output"
 
 if echo "$psql_output" | grep -q "FATAL"; then
