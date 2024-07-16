@@ -87,6 +87,7 @@
 
 6. **Configure and signup for Supabase**
    - Signup for Supabase Free Tier
+   - You can run [sb_setup.sh](sb_setup.sh) at this point to configure the supabase (Linux)
    - Optional: Setup custom domain to ensure supabase isn't blocked by default corporate proxy
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase URL and API key.
 

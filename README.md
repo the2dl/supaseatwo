@@ -38,6 +38,7 @@ Full installation docs can be found in [install](docs/install.md).
 
 1. **Supabase Configuration:**
    - Sign up for a Supabase Free tier (unless you require more storage).
+   - At this point you can run [sb_setup.sh](sb_setup.sh) to configure the supabase setup (Linux Supported) 
    - Set up your Supabase project and obtain the URL and API key from settings.
    - Update the configuration settings in `client/utils/database.py` and `agent/utils/config.py` with your Supabase credentials.
 
