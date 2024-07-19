@@ -1,16 +1,19 @@
 import openai
 from cryptography.fernet import Fernet
-from utils.database import OPENAI_API_KEY
+from utils.database import OPENAI_API_KEY, get_setting
 
 def generate_summary(command, command_output, encryption_key=None):
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+    # Fetch the os value from the settings table
+    os_value = get_setting('os')
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a red team operator."},
-                {"role": "user", "content": f"The following command was executed: '{command}'. Here is the output:\n{command_output}. Summarize this and identify potential next steps for your engagement in 100 words or less."}
+                {"role": "system", "content": "You are a red team operator focused on penetration testing and vulnerability assessment. Your goal is to provide concise summaries of command outputs and recommend strategic next steps for further engagement."},
+                {"role": "user", "content": f"The following command was executed on {os_value} OS: '{command}'. Here is the output:\n{command_output}. Summarize the results and suggest potential next steps for our red team engagement, keeping your response under 100 words."}
             ],
         )
         summary = response.choices[0].message.content.strip()
