@@ -8,9 +8,9 @@ def generate_email_template(topic, recipient_name, url_to_file):
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a professional phishing expert."},
+                {"role": "system", "content": "You are a red team member who works in information security. You are working on a campaign."},
                 {"role": "user", "content": f"Write an email to {recipient_name} on the following topic: '{topic}'. In the body, embed the link to the URL: {url_to_file}. Make the email sound professional."}
             ],
         )
