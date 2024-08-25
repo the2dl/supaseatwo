@@ -669,6 +669,17 @@ def send_command_and_get_output(hostname, logged_in_username, command_mappings, 
             else:
                 command_text = f'create_scheduled_task {task_name} "{trigger_time}"'
 
+        if command_text.startswith("ad_health"):
+            parts = command_text.split(maxsplit=4)
+            if len(parts) != 5:
+                print(f"{RED}Error:{RESET} Invalid ad_health command format. Use 'ad_health <domain_controller> <domain\\username> <password> <output_file>'.")
+                continue
+            _, domain_controller, username, password, output_file = parts
+            if '\\' not in username:
+                print(f"{RED}Error:{RESET} Username should be in the format 'domain\\username'.")
+                continue
+            command_text = f"ad_health {domain_controller} {username} {password} {output_file}"
+
         if linked_smb_ip and not command_text.startswith("link smb agent") and not command_text.startswith("unlink smb agent"):
             command_text = f"smb {command_text}"
 

@@ -8,3 +8,6 @@ pywinrm
 postgrest
 pypsexec
 wim
+wmi
+ldap3
+pycryptodome

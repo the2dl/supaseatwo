@@ -301,6 +301,17 @@ detailed_help = {
         "command": "exit",
         "parameters": "none",
         "example": "exit"
+    },
+    "ad_health": {
+        "description": "Retrieves users and groups from Active Directory and outputs to a JSON file.",
+        "command": "ad_health <domain_controller.fqdn> <domain\\username> <password> <output_file>",
+        "parameters": (
+            "<domain_controller.fqdn>: The domain controller to connect to\n"
+            "<username>: Username for AD authentication\n"
+            "<password>: Password for AD authentication\n"
+            "<output_file>: Path to save the output JSON file"
+        ),
+        "example": "ad_health dc.example.com domain\\user password C:\\ProgramData\\ad_health_output.json"
     }
 }
 
@@ -368,5 +379,6 @@ def display_help(command_mappings):
     print(" start_scheduled_task <task_name> :: Start a scheduled task")
     print(" view_history                  :: View the command history for the current host")
     print(" view_history grep <term>      :: Search the command history for the current host with a specific term")
+    print(" ad_health <domain_controller.fqdn> <domain\\username> <password> <output_file> :: Retrieve Active Directory health information")
     print(" kill                          :: Terminate the agent")
     print(" exit                          :: Return to main menu\n")
