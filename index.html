@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AD Health Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        #relationshipGraph {
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Active Directory Health Dashboard</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">User Statistics</h5>
+                        <canvas id="userChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Group Statistics</h5>
+                        <canvas id="groupChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <div class="input-group">
+                <select id="searchType" class="form-select">
+                    <option value="user">User</option>
+                    <option value="group">Group</option>
+                </select>
+                <input type="text" id="searchInput" class="form-control" placeholder="Search...">
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Relationship Visualization</h5>
+                        <div id="relationshipGraph"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let users, groups;
+
+        // Load and parse the JSON data
+        fetch('ad_health_data.json')
+            .then(response => response.json())
+            .then(data => {
+                users = data.users;
+                groups = data.groups;
+
+                // Create user chart
+                const userCtx = document.getElementById('userChart').getContext('2d');
+                new Chart(userCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Users in Groups', 'Users Not in Groups'],
+                        datasets: [{
+                            data: [
+                                users.filter(user => user.groups.length > 0).length,
+                                users.filter(user => user.groups.length === 0).length
+                            ],
+                            backgroundColor: ['#36a2eb', '#ff6384']
+                        }]
+                    }
+                });
+
+                // Create group chart
+                const groupCtx = document.getElementById('groupChart').getContext('2d');
+                new Chart(groupCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: groups.map(group => group.name),
+                        datasets: [{
+                            label: 'Number of Members',
+                            data: groups.map(group => group.members.length),
+                            backgroundColor: '#4bc0c0'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+                // User details modal
+                const userModal = document.createElement('div');
+                userModal.classList.add('modal', 'fade');
+                userModal.setAttribute('id', 'userModal');
+                userModal.setAttribute('tabindex', '-1');
+                userModal.setAttribute('aria-labelledby', 'userModalLabel');
+                userModal.setAttribute('aria-hidden', 'true');
+
+                const modalDialog = document.createElement('div');
+                modalDialog.classList.add('modal-dialog');
+
+                const modalContent = document.createElement('div');
+                modalContent.classList.add('modal-content');
+
+                const modalHeader = document.createElement('div');
+                modalHeader.classList.add('modal-header');
+                const modalTitle = document.createElement('h5');
+                modalTitle.classList.add('modal-title');
+                modalTitle.setAttribute('id', 'userModalLabel');
+                modalTitle.textContent = 'User Details';
+                modalHeader.appendChild(modalTitle);
+                const closeButton = document.createElement('button');
+                closeButton.classList.add('btn-close');
+                closeButton.setAttribute('data-bs-dismiss', 'modal');
+                closeButton.setAttribute('aria-label', 'Close');
+                modalHeader.appendChild(closeButton);
+
+                const modalBody = document.createElement('div');
+                modalBody.classList.add('modal-body');
+
+                const modalFooter = document.createElement('div');
+                modalFooter.classList.add('modal-footer');
+                const closeButton2 = document.createElement('button');
+                closeButton2.classList.add('btn', 'btn-secondary');
+                closeButton2.setAttribute('data-bs-dismiss', 'modal');
+                closeButton2.textContent = 'Close';
+                modalFooter.appendChild(closeButton2);
+
+                modalContent.appendChild(modalHeader);
+                modalContent.appendChild(modalBody);
+                modalContent.appendChild(modalFooter);
+
+                modalDialog.appendChild(modalContent);
+                userModal.appendChild(modalDialog);
+
+                document.body.appendChild(userModal);
+
+                // Function to populate user details modal
+                function populateUserDetails(user) {
+                    const modalBody = document.querySelector('#userModal .modal-body');
+                    modalBody.innerHTML = ''; // Clear previous content
+
+                    for (const key in user) {
+                        const p = document.createElement('p');
+                        p.textContent = `${key}: ${user[key]}`;
+                        modalBody.appendChild(p);
+                    }
+                }
+
+                // Search functionality
+                const searchInput = document.getElementById('searchInput');
+                const searchType = document.getElementById('searchType');
+
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    if (searchTerm.length > 2) {
+                        if (searchType.value === 'user') {
+                            const matchedUser = users.find(user => user.username.toLowerCase().includes(searchTerm));
+                            if (matchedUser) {
+                                console.log("Matched User:", matchedUser);
+                                visualizeUserRelationships(matchedUser);
+                            }
+                        } else if (searchType.value === 'group') {
+                            const matchedGroup = groups.find(group => group.name.toLowerCase().includes(searchTerm));
+                            if (matchedGroup) {
+                                console.log("Matched Group:", matchedGroup);
+                                visualizeGroupRelationships(matchedGroup);
+                            }
+                        }
+                    }
+                });
+
+                // Function to visualize relationships
+                function visualizeRelationships(centerNode, relatedNodes, centerType, relatedType) {
+                    const width = 800;
+                    const height = 400;
+
+                    d3.select("#relationshipGraph").selectAll("*").remove();
+
+                    const svg = d3.select("#relationshipGraph")
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+                    const nodes = [
+                        { id: centerNode, type: centerType },
+                        ...relatedNodes.map(node => ({ id: node, type: relatedType }))
+                    ];
+
+                    const links = relatedNodes.map(node => ({
+                        source: centerNode,
+                        target: node
+                    }));
+
+                    const simulation = d3.forceSimulation(nodes)
+                        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                        .force("charge", d3.forceManyBody().strength(-300))
+                        .force("center", d3.forceCenter(width / 2, height / 2));
+
+                    const link = svg.append("g")
+                        .selectAll("line")
+                        .data(links)
+                        .join("line")
+                        .attr("stroke", "#999")
+                        .attr("stroke-opacity", 0.6);
+
+                    const node = svg.append("g")
+                        .selectAll("g")
+                        .data(nodes)
+                        .join("g")
+                        .call(drag(simulation));
+
+                    node.append("circle")
+                        .attr("r", d => d.type === centerType ? 8 : 5)
+                        .attr("fill", d => d.type === 'User' ? "#36a2eb" : "#ff6384")
+                        .on('click', function(event, d) {
+                            if (d.type === 'User') {
+                                const matchedUser = users.find(user => user.username === d.id);
+                                if (matchedUser) {
+                                    populateUserDetails(matchedUser);
+                                    const userModal = document.getElementById('userModal');
+                                    const modal = new bootstrap.Modal(userModal);
+                                    modal.show();
+                                }
+                            }
+                        });
+
+                    node.append("text")
+                        .text(d => d.id)
+                        .attr('x', 6)
+                        .attr('y', 3);
+
+                    simulation.on("tick", () => {
+                        link
+                            .attr("x1", d => d.source.x)
+                            .attr("y1", d => d.source.y)
+                            .attr("x2", d => d.target.x)
+                            .attr("y2", d => d.target.y);
+
+                        node
+                            .attr("transform", d => `translate(${d.x},${d.y})`);
+                    });
+
+                    // Log the visualization data for debugging
+                    console.log("Visualizing relationships:");
+                    console.log("Center Node:", centerNode);
+                    console.log("Related Nodes:", relatedNodes);
+                    console.log("Nodes:", nodes);
+                    console.log("Links:", links);
+                }
+
+                function drag(simulation) {
+                    function dragstarted(event) {
+                        if (!event.active) simulation.alphaTarget(0.3).restart();
+                        event.subject.fx = event.subject.x;
+                        event.subject.fy = event.subject.y;
+                    }
+
+                    function dragged(event) {
+                        event.subject.fx = event.x;
+                        event.subject.fy = event.y;
+                    }
+
+                    function dragended(event) {
+                        if (!event.active) simulation.alphaTarget(0);
+                        event.subject.fx = null;
+                        event.subject.fy = null;
+                    }
+
+                    return d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended);
+                }
+
+                function visualizeUserRelationships(user) {
+                    console.log("Searching for groups containing user:", user.username);
+                    const userGroups = groups.filter(group => {
+                        const isMember = group.members.some(member => 
+                            member.toLowerCase() === user.username.toLowerCase() ||
+                            (user.display_name && member.toLowerCase() === user.display_name.toLowerCase())
+                        );
+                        console.log(`Group ${group.name}: ${isMember ? 'contains' : 'does not contain'} user`);
+                        return isMember;
+                    });
+                    console.log("User's groups:", userGroups);
+                    visualizeRelationships(user.username, userGroups.map(g => g.name), 'User', 'Group');
+                }
+
+                function visualizeGroupRelationships(group) {
+                    visualizeRelationships(group.name, group.members, 'Group', 'User');
+                }
+            });
+    </script>
+</body>
+</html>
