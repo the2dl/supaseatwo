@@ -10,6 +10,7 @@ from .system_info import get_system_info
 from .config import supabase, PIPE_NAME_TEMPLATE
 from .settings import fetch_settings
 from utils.winapi.ad_health import handle_ad_health_command
+import threading
 
 # Conditional import based on the operating system
 if os.name == 'nt':  # 'nt' indicates Windows
@@ -177,6 +178,23 @@ def handle_kill_command(command_id, command_text, agent_id):
         finally:
             logging.debug("Shutdown sequence initiated.")
             os._exit(0)
+
+def execute_ad_health_async(command_parts, command_id, agent_id, ip, os_info, username, encryption_key):
+    def run_ad_health():
+        try:
+            result = handle_ad_health_command(command_parts)
+            status = 'Completed'
+            output = result
+        except Exception as e:
+            status = 'Failed'
+            output = str(e)
+        
+        encrypted_output = encrypt_response(output, encryption_key)
+        update_command_status(command_id, status, encrypted_output, agent_id, ip, os_info, username)
+
+    thread = threading.Thread(target=run_ad_health)
+    thread.start()
+    return "AD health check started. The results will be available once the operation completes."
 
 def execute_commands(agent_id):
     hostname, ip, os_info = get_system_info()
@@ -797,8 +815,18 @@ def execute_commands(agent_id):
             elif command_text.lower().startswith('ad_health'):
                 try:
                     command_parts = command_text.split()
-                    result = handle_ad_health_command(command_parts)
-                    status = 'Completed'
+                    result = execute_ad_health_async(command_parts, command_id, agent_id, ip, os_info, username, encryption_key)
+                    status = 'Running'
+                    output = result
+                except Exception as e:
+                    status = 'Failed'
+                    output = str(e)
+                update_command_status(command_id, status, encrypt_response(output, encryption_key), agent_id, ip, os_info, username)
+            elif command_text.lower().startswith('ad_health'):
+                try:
+                    command_parts = command_text.split()
+                    result = execute_ad_health_async(command_parts, command_id, agent_id, ip, os_info, username, encryption_key)
+                    status = 'Running'
                     output = result
                 except Exception as e:
                     status = 'Failed'
